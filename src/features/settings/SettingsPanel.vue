@@ -41,10 +41,33 @@ function updateMaxHistory(value: string) {
     settingsStore.updateSettings({ maxHistoryItems: num })
   }
 }
+
+function toggleDefaultHeader(index: number) {
+  const headers = [...settingsStore.settings.defaultHeaders]
+  headers[index] = { ...headers[index], enabled: !headers[index].enabled }
+  settingsStore.updateSettings({ defaultHeaders: headers })
+}
+
+function updateDefaultHeader(index: number, field: 'key' | 'value', value: string) {
+  const headers = [...settingsStore.settings.defaultHeaders]
+  headers[index] = { ...headers[index], [field]: value }
+  settingsStore.updateSettings({ defaultHeaders: headers })
+}
+
+function removeDefaultHeader(index: number) {
+  const headers = settingsStore.settings.defaultHeaders.filter((_, i) => i !== index)
+  settingsStore.updateSettings({ defaultHeaders: headers })
+}
+
+function addDefaultHeader() {
+  const headers = [...settingsStore.settings.defaultHeaders, { key: '', value: '', enabled: true }]
+  settingsStore.updateSettings({ defaultHeaders: headers })
+}
 </script>
 
 <template>
-  <div class="max-w-2xl mx-auto p-6 space-y-8">
+  <div class="h-full overflow-y-auto">
+  <div class="max-w-2xl mx-auto p-6 space-y-8 pb-16">
     <div>
       <h2 class="text-lg font-semibold text-primary">Settings</h2>
       <p class="text-sm text-secondary mt-0.5">Configure Snag to your liking</p>
@@ -122,6 +145,58 @@ function updateMaxHistory(value: string) {
       </div>
     </section>
 
+    <!-- Default Headers -->
+    <section class="space-y-4">
+      <h3 class="text-sm font-medium text-primary border-b border-border pb-2">Default Headers</h3>
+      <p class="text-xs text-muted">These headers are automatically included in every request. Uncheck to disable.</p>
+
+      <div class="space-y-2">
+        <div
+          v-for="(header, index) in settingsStore.settings.defaultHeaders"
+          :key="index"
+          class="flex items-center gap-3 px-3 py-2 border border-border rounded"
+        >
+          <input
+            type="checkbox"
+            :checked="header.enabled"
+            class="w-4 h-4 rounded accent-accent cursor-pointer"
+            @change="toggleDefaultHeader(index)"
+          />
+          <div class="flex-1 flex items-center gap-2">
+            <input
+              :value="header.key"
+              class="w-[160px] text-sm font-mono text-primary bg-transparent border-b border-transparent focus:border-accent focus:outline-none"
+              @input="updateDefaultHeader(index, 'key', ($event.target as HTMLInputElement).value)"
+            />
+            <span class="text-muted">:</span>
+            <input
+              :value="header.value"
+              class="flex-1 text-sm font-mono text-secondary bg-transparent border-b border-transparent focus:border-accent focus:outline-none"
+              @input="updateDefaultHeader(index, 'value', ($event.target as HTMLInputElement).value)"
+            />
+          </div>
+          <button
+            class="text-muted hover:text-error transition-colors"
+            @click="removeDefaultHeader(index)"
+          >
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        <button
+          class="flex items-center gap-1.5 px-3 py-1.5 text-xs text-muted hover:text-primary transition-colors"
+          @click="addDefaultHeader"
+        >
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+          </svg>
+          Add Header
+        </button>
+      </div>
+    </section>
+
     <!-- Data -->
     <section class="space-y-4">
       <h3 class="text-sm font-medium text-primary border-b border-border pb-2">Data</h3>
@@ -152,5 +227,6 @@ function updateMaxHistory(value: string) {
         <p>A fast, lightweight API client built with Tauri + Vue</p>
       </div>
     </section>
+  </div>
   </div>
 </template>

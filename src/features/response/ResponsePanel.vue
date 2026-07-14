@@ -214,80 +214,61 @@ async function copyBody() {
         </div>
 
         <!-- Console -->
-        <div v-else-if="activeTab === 'console'" class="p-3 space-y-3">
-          <div v-if="response && request">
-            <!-- Request summary -->
+        <div v-else-if="activeTab === 'console'" class="p-3 space-y-3 text-xs">
+          <div v-if="response">
+            <!-- Request section -->
             <div class="border border-border rounded overflow-hidden">
               <div class="px-3 py-2 bg-surface-alt border-b border-border flex items-center gap-2">
-                <span class="text-[10px] font-medium text-muted uppercase tracking-wider">Request</span>
-                <span class="ml-auto text-[10px] text-muted">{{ response.time }}ms</span>
+                <span class="text-[10px] font-medium text-muted uppercase tracking-wider">Request Headers</span>
               </div>
-              <div class="p-3 space-y-2 text-xs">
-                <div class="flex items-center gap-2">
-                  <span class="font-mono font-semibold text-accent">{{ request.method }}</span>
-                  <span class="font-mono text-primary break-all">{{ request.url }}</span>
+              <div class="p-3 space-y-0.5">
+                <div
+                  v-for="(value, key) in (response.requestHeaders || {})"
+                  :key="key"
+                  class="flex font-mono text-[11px]"
+                >
+                  <span class="text-secondary min-w-[140px] flex-shrink-0">{{ key }}:</span>
+                  <span class="text-primary break-all">{{ value }}</span>
                 </div>
-                <!-- Request headers sent -->
-                <div v-if="request.headers.filter(h => h.enabled && h.key).length > 0">
-                  <div class="text-[10px] text-muted uppercase mt-2 mb-1">Request Headers</div>
-                  <div class="space-y-0.5">
-                    <div
-                      v-for="h in request.headers.filter(h => h.enabled && h.key)"
-                      :key="h.id"
-                      class="flex gap-2 font-mono text-[11px]"
-                    >
-                      <span class="text-secondary">{{ h.key }}:</span>
-                      <span class="text-primary">{{ h.value }}</span>
-                    </div>
-                  </div>
-                </div>
-                <!-- Request body -->
-                <div v-if="request.body.type !== 'none' && request.body.raw">
-                  <div class="text-[10px] text-muted uppercase mt-2 mb-1">Request Body</div>
-                  <pre class="text-[11px] font-mono text-primary bg-surface-alt rounded p-2 max-h-[100px] overflow-auto whitespace-pre-wrap break-all">{{ request.body.raw }}</pre>
+                <div v-if="!response.requestHeaders || Object.keys(response.requestHeaders).length === 0" class="text-muted">
+                  No headers captured
                 </div>
               </div>
             </div>
 
-            <!-- Response summary -->
-            <div class="border border-border rounded overflow-hidden">
+            <!-- Response Headers section -->
+            <div class="border border-border rounded overflow-hidden mt-3">
               <div class="px-3 py-2 bg-surface-alt border-b border-border flex items-center gap-2">
-                <span class="text-[10px] font-medium text-muted uppercase tracking-wider">Response</span>
-                <BaseBadge :variant="statusVariant" class="ml-auto">
-                  {{ response.status }} {{ response.statusText }}
-                </BaseBadge>
+                <span class="text-[10px] font-medium text-muted uppercase tracking-wider">Response Headers</span>
+                <div class="ml-auto flex items-center gap-2">
+                  <BaseBadge :variant="statusVariant">{{ response.status }} {{ response.statusText }}</BaseBadge>
+                </div>
               </div>
-              <div class="p-3 space-y-2 text-xs">
-                <!-- Response meta -->
-                <div class="flex items-center gap-4 text-[11px] text-secondary">
-                  <span>Status: <span class="text-primary">{{ response.status }} {{ response.statusText }}</span></span>
-                  <span>Time: <span class="text-primary">{{ response.time }}ms</span></span>
-                  <span>Size: <span class="text-primary">{{ formatSize(response.size) }}</span></span>
-                </div>
-                <!-- Response headers -->
-                <div>
-                  <div class="text-[10px] text-muted uppercase mt-2 mb-1">Response Headers</div>
-                  <div class="space-y-0.5">
-                    <div
-                      v-for="(value, key) in response.headers"
-                      :key="key"
-                      class="flex gap-2 font-mono text-[11px]"
-                    >
-                      <span class="text-secondary">{{ key }}:</span>
-                      <span class="text-primary break-all">{{ value }}</span>
-                    </div>
-                  </div>
-                </div>
-                <!-- Response body preview -->
-                <div>
-                  <div class="text-[10px] text-muted uppercase mt-2 mb-1">Response Body (preview)</div>
-                  <pre class="text-[11px] font-mono text-primary bg-surface-alt rounded p-2 max-h-[150px] overflow-auto whitespace-pre-wrap break-all">{{ response.body.slice(0, 2000) }}{{ response.body.length > 2000 ? '\n... (truncated)' : '' }}</pre>
+              <div class="p-3 space-y-0.5">
+                <div
+                  v-for="(value, key) in response.headers"
+                  :key="key"
+                  class="flex font-mono text-[11px]"
+                >
+                  <span class="text-secondary min-w-[140px] flex-shrink-0">{{ key }}:</span>
+                  <span class="text-primary break-all">{{ value }}</span>
                 </div>
               </div>
             </div>
+
+            <!-- Response Body section -->
+            <div class="border border-border rounded overflow-hidden mt-3">
+              <div class="px-3 py-2 bg-surface-alt border-b border-border flex items-center gap-2">
+                <span class="text-[10px] font-medium text-muted uppercase tracking-wider">Response Body</span>
+                <span class="ml-auto text-[10px] text-muted">{{ formatSize(response.size) }} · {{ response.time }}ms</span>
+              </div>
+              <div class="p-3">
+                <pre class="text-[11px] font-mono text-primary max-h-[300px] overflow-auto whitespace-pre-wrap break-all">{{ formattedBody }}</pre>
+              </div>
+            </div>
           </div>
-          <div v-else class="text-xs text-muted text-center py-4">
-            No console entries yet. Send a request to see full details here.
+          <div v-else class="text-muted text-center py-6">
+            Send a request to see full details here.
           </div>
         </div>
       </div>

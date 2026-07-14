@@ -18,34 +18,39 @@ A fast, lightweight API client built with Tauri + Vue. Think Postman, but native
 ## Features
 
 - **Request Builder** — method, URL, headers, params, body (JSON, raw, form-data, URL-encoded, binary), auth (Bearer, Basic, API Key)
-- **Response Viewer** — body with line numbers, pretty/raw toggle, headers table, status/time/size badges, copy to clipboard
-- **Collections** — tree structure with folders, rename, duplicate, delete, three-dot context menu
-- **Environment Variables** — multiple environments, quick switch, `{{variable}}` syntax with autocomplete in all input fields, inline create/edit from URL bar
-- **Tabs** — multi-tab workspace, dirty indicator, double-click to rename, save to collection, linked tabs (re-open activates existing tab)
-- **History** — auto-saved, grouped by date, click to restore request + response
-- **Settings** — theme (light/dark/system), default method, timeout, follow redirects, max history
-- **File Upload** — form-data file fields + binary body via native file picker
-- **Header Autocomplete** — standard HTTP headers with context-aware value suggestions
+- **Response Viewer** — body with line numbers, pretty/raw toggle, headers table, status/time/size badges, copy to clipboard, resizable split pane
+- **Console** — full request/response inspector: actual sent headers (including defaults + Snag-Token), response headers, response body, timing
+- **Collections** — tree structure with nested folders, rename, duplicate, delete, three-dot context menu at every level
+- **Environment Variables** — multiple environments, quick switch from URL bar, `{{variable}}` autocomplete in all input fields (URL, headers, params, auth, body), inline create/edit via modal
+- **Tabs** — multi-tab workspace, dirty indicator, double-click to rename, save to collection (with folder picker), linked tabs (same item = same tab), per-tab save button
+- **History** — auto-saved after each request, grouped by date, click to restore (deduplicates tabs), delete individual entries
+- **Settings** — theme (light/dark/system), default method, timeout, follow redirects, max history, configurable default headers (User-Agent, Accept, Accept-Encoding, Snag-Token)
+- **File Upload** — form-data file fields (per-row text/file toggle) + binary body via native file picker
+- **Header Autocomplete** — standard HTTP headers with context-aware value suggestions (Content-Type, Accept, Cache-Control, etc.)
+- **cURL Import** — paste a cURL command in the URL bar, auto-fills method, URL, headers, body, and auth
+- **Import Collections** — Postman Collection v2.1 (JSON) and OpenAPI 3.x / Swagger 2.x (JSON or YAML)
+- **Bulk Edit** — params and headers have a Table/Bulk Edit toggle (textarea, one `key:value` per line)
+- **Default Headers** — auto-injected headers (configurable in settings): User-Agent, Accept, Accept-Encoding, Snag-Token (unique UUID per request)
 
 ## Project Structure
 
 ```
 src/
-├── assets/styles/       # Tailwind + semantic color tokens
-├── components/base/     # Reusable UI (Button, Input, Select, Modal, Dropdown, etc.)
+├── assets/styles/       # Tailwind + semantic color tokens + dark mode
+├── components/base/     # Reusable UI (Button, Input, Select, Modal, Dropdown, SplitPane, etc.)
 ├── composables/         # useHttp, useStorage, useTheme
 ├── features/
-│   ├── environments/    # Environment panel + selector
-│   ├── history/         # History panel
-│   ├── request/         # URL bar, headers, params, body, auth
-│   ├── response/        # Response viewer
+│   ├── environments/    # Environment panel, selector, inline variable management
+│   ├── history/         # History panel (grouped by date)
+│   ├── request/         # URL bar, headers, params, body, auth, form-data, binary
+│   ├── response/        # Response viewer (body, headers, console)
 │   ├── settings/        # Settings panel
-│   ├── sidebar/         # Sidebar + collection tree
+│   ├── sidebar/         # Sidebar (collections tree, history, envs, import modal)
 │   └── tabs/            # Tab bar + tab content router
 ├── layouts/             # DefaultLayout (sidebar + main)
 ├── stores/              # Pinia (collections, environments, history, tabs, settings)
 ├── types/               # TypeScript types (request, collection, environment, common)
-└── utils/               # Formatters, HTTP header data, curl parser (planned)
+└── utils/               # Formatters, HTTP headers, cURL parser, Postman importer, OpenAPI importer
 
 src-tauri/
 ├── src/                 # Rust (Tauri plugins: http, fs, dialog, opener)
@@ -81,9 +86,26 @@ npx vue-tsc --noEmit
 
 `npm run tauri dev` enables all native features without limitations.
 
+## Keyboard Shortcuts
+
+| Action | Shortcut |
+|--------|----------|
+| Send request | Cmd+Enter |
+| New tab | Cmd+T |
+| Close tab | Cmd+W |
+| Save request | Cmd+S |
+
+## Import Support
+
+| Format | Source |
+|--------|--------|
+| Postman Collection | v2.1 JSON (folders, requests, headers, body, auth, variables) |
+| OpenAPI Spec | 3.x / Swagger 2.x, JSON or YAML (tags → folders, paths → requests, schemas → example bodies, security → auth) |
+| cURL | Paste in URL bar (method, URL, headers, body, basic auth) |
+
 ## Roadmap
 
-- [ ] Import/Export (cURL, Postman collection)
+- [ ] Export collection (Postman format)
 - [ ] Pre-request scripts & tests
 - [ ] Code editor (Monaco/CodeMirror) for body & scripts
 - [ ] Response syntax highlighting

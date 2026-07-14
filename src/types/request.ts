@@ -49,6 +49,12 @@ export interface ResponseData {
   body: string
   size: number
   time: number // ms
+  /** The actual headers that were sent (including defaults) */
+  requestHeaders?: Record<string, string>
+  /** The final resolved URL that was sent */
+  requestUrl?: string
+  /** The method used */
+  requestMethod?: string
 }
 
 export function createEmptyRequest(): RequestConfig {

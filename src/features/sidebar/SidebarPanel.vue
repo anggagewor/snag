@@ -8,6 +8,7 @@ import type { CollectionItem } from '@/types/collection'
 import { createEmptyRequest } from '@/types/request'
 import BaseDropdown from '@/components/base/BaseDropdown.vue'
 import CollectionTree from './CollectionTree.vue'
+import ImportModal from './ImportModal.vue'
 import HistoryPanel from '@/features/history/HistoryPanel.vue'
 
 const collectionsStore = useCollectionsStore()
@@ -15,6 +16,7 @@ const tabsStore = useTabsStore()
 const environmentsStore = useEnvironmentsStore()
 
 const activeSection = ref<'collections' | 'history' | 'envs'>('collections')
+const showImportModal = ref(false)
 
 function handleNewRequest() {
   tabsStore.openRequestTab()
@@ -145,6 +147,15 @@ function handleNewFolderInCollection() {
               </svg>
               New Collection
             </button>
+            <button
+              class="w-full flex items-center gap-2 px-3 py-2 text-xs text-primary hover:bg-surface-hover text-left"
+              @click="showImportModal = true; close()"
+            >
+              <svg class="w-3.5 h-3.5 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+              </svg>
+              Import Collection
+            </button>
           </template>
         </BaseDropdown>
       </div>
@@ -201,4 +212,7 @@ function handleNewFolderInCollection() {
       </div>
     </div>
   </div>
+
+  <!-- Import Modal -->
+  <ImportModal :open="showImportModal" @close="showImportModal = false" />
 </template>

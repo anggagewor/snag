@@ -6,6 +6,12 @@ import type { ThemeMode } from '@/types/common'
 
 const STORAGE_FILE = 'settings.json'
 
+export interface DefaultHeader {
+  key: string
+  value: string
+  enabled: boolean
+}
+
 export interface AppSettings {
   theme: ThemeMode
   defaultMethod: string
@@ -13,6 +19,7 @@ export interface AppSettings {
   timeout: number // seconds
   maxHistoryItems: number
   sidebarWidth: number
+  defaultHeaders: DefaultHeader[]
 }
 
 const DEFAULT_SETTINGS: AppSettings = {
@@ -22,6 +29,11 @@ const DEFAULT_SETTINGS: AppSettings = {
   timeout: 30,
   maxHistoryItems: 100,
   sidebarWidth: 280,
+  defaultHeaders: [
+    { key: 'User-Agent', value: 'SnagRuntime/1.0.0', enabled: true },
+    { key: 'Accept', value: '*/*', enabled: true },
+    { key: 'Accept-Encoding', value: 'gzip, deflate, br', enabled: true },
+  ],
 }
 
 export const useSettingsStore = defineStore('settings', () => {

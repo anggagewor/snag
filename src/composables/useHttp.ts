@@ -1,6 +1,7 @@
 import { ref } from 'vue'
 
 import { useEnvironmentsStore } from '@/stores/environments'
+import { useSettingsStore } from '@/stores/settings'
 import type { RequestConfig, ResponseData } from '@/types/request'
 import type { KeyValuePair } from '@/types/common'
 
@@ -38,8 +39,19 @@ export function useHttp() {
 
   function buildHeaders(request: RequestConfig): Record<string, string> {
     const headers: Record<string, string> = {}
+    const settingsStore = useSettingsStore()
 
-    // Add enabled headers
+    // Add default headers (from settings)
+    settingsStore.settings.defaultHeaders
+      .filter((h) => h.enabled)
+      .forEach((h) => {
+        headers[h.key] = h.value
+      })
+
+    // Add snag-token (like postman-token)
+    headers['Snag-Token'] = crypto.randomUUID()
+
+    // Add user-defined headers (override defaults if same key)
     request.headers
       .filter((h) => h.enabled && h.key)
       .forEach((h) => {
@@ -156,6 +168,9 @@ export function useHttp() {
         body: responseBody,
         size: new Blob([responseBody]).size,
         time: Math.round(endTime - startTime),
+        requestHeaders: { ...headers },
+        requestUrl: finalUrl,
+        requestMethod: request.method,
       }
     } catch (err) {
       error.value = err instanceof Error ? err.message : 'Request failed'
