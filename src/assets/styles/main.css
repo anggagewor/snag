@@ -1,0 +1,77 @@
+@import "tailwindcss";
+
+@theme {
+  /* Surface colors */
+  --color-surface: #ffffff;
+  --color-surface-alt: #f8f9fa;
+  --color-surface-hover: #f1f3f5;
+
+  /* Text colors */
+  --color-primary: #1a1a2e;
+  --color-secondary: #6b7280;
+  --color-muted: #9ca3af;
+
+  /* Accent */
+  --color-accent: #6366f1;
+  --color-accent-hover: #4f46e5;
+
+  /* Borders */
+  --color-border: #e5e7eb;
+  --color-border-muted: #f3f4f6;
+
+  /* Status colors */
+  --color-success: #10b981;
+  --color-warning: #f59e0b;
+  --color-error: #ef4444;
+  --color-info: #3b82f6;
+
+  /* HTTP method colors */
+  --color-method-get: #10b981;
+  --color-method-post: #f59e0b;
+  --color-method-put: #3b82f6;
+  --color-method-patch: #8b5cf6;
+  --color-method-delete: #ef4444;
+  --color-method-head: #6b7280;
+  --color-method-options: #ec4899;
+}
+
+/* Dark mode overrides */
+.dark {
+  --color-surface: #1e1e2e;
+  --color-surface-alt: #181825;
+  --color-surface-hover: #313244;
+
+  --color-primary: #cdd6f4;
+  --color-secondary: #a6adc8;
+  --color-muted: #6c7086;
+
+  --color-accent: #89b4fa;
+  --color-accent-hover: #74c7ec;
+
+  --color-border: #313244;
+  --color-border-muted: #45475a;
+}
+
+/* Base resets */
+body {
+  @apply bg-surface text-primary font-sans antialiased;
+  overflow: hidden;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-border rounded-full;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-secondary;
+}
