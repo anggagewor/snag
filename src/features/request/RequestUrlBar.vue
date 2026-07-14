@@ -3,12 +3,14 @@ import { computed } from 'vue'
 
 import { HttpMethod } from '@/types/common'
 import { useEnvironmentsStore } from '@/stores/environments'
+import { useTabsStore } from '@/stores/tabs'
 import type { RequestConfig } from '@/types/request'
 import BaseButton from '@/components/base/BaseButton.vue'
 import BaseSelect from '@/components/base/BaseSelect.vue'
 import type { SelectOption } from '@/components/base/BaseSelect.vue'
 import BaseUrlInput from '@/components/base/BaseUrlInput.vue'
 import EnvironmentSelector from '@/features/environments/EnvironmentSelector.vue'
+import { parseCurl } from '@/utils/curl-parser'
 
 const props = defineProps<{
   request: RequestConfig
@@ -20,6 +22,8 @@ const emit = defineEmits<{
   'update:url': [url: string]
   send: []
 }>()
+
+const tabsStore = useTabsStore()
 
 const environmentsStore = useEnvironmentsStore()
 
@@ -50,6 +54,26 @@ const hasUnresolvedVars = computed(() => {
 function onMethodChange(value: string) {
   emit('update:method', value as HttpMethod)
 }
+
+function onPaste(e: ClipboardEvent) {
+  const text = e.clipboardData?.getData('text') || ''
+  if (/^\s*curl\s/i.test(text)) {
+    e.preventDefault()
+    const parsed = parseCurl(text)
+    const activeTab = tabsStore.activeTab
+    if (activeTab) {
+      tabsStore.updateTabRequest(activeTab.id, {
+        method: parsed.method,
+        url: parsed.url,
+        headers: parsed.headers,
+        body: parsed.body,
+        auth: parsed.auth,
+      })
+    }
+    emit('update:method', parsed.method)
+    emit('update:url', parsed.url)
+  }
+}
 </script>
 
 <template>
@@ -65,7 +89,7 @@ function onMethodChange(value: string) {
     </div>
 
     <!-- URL input wrapper -->
-    <div class="flex-1 relative">
+    <div class="flex-1 relative" @paste="onPaste">
       <BaseUrlInput
         :model-value="request.url"
         placeholder="Enter request URL..."

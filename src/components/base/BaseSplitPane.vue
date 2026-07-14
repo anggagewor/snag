@@ -1,13 +1,15 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 
-defineProps<{
+const props = withDefaults(defineProps<{
   direction?: 'horizontal' | 'vertical'
   initialSplit?: number // percentage 0-100
   minSize?: number // px
-}>()
+}>(), {
+  initialSplit: 50,
+})
 
-const splitPercent = ref(50)
+const splitPercent = ref(props.initialSplit)
 const isDragging = ref(false)
 const containerRef = ref<HTMLElement | null>(null)
 
@@ -38,7 +40,7 @@ function stopDrag() {
     class="flex flex-col h-full overflow-hidden"
     :class="{ 'select-none': isDragging }"
   >
-    <div class="overflow-auto" :style="{ height: `${initialSplit ?? splitPercent}%` }">
+    <div class="overflow-auto" :style="{ height: `${splitPercent}%` }">
       <slot name="top" />
     </div>
     <div

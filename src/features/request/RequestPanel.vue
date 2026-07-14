@@ -54,10 +54,7 @@ async function handleSend() {
       @send="handleSend"
     />
 
-    <!-- Error display -->
-    <div v-if="error" class="mx-3 mb-2 px-3 py-2 bg-error/10 text-error text-sm rounded">
-      {{ error }}
-    </div>
+    <!-- Error display (inline, no longer separate) -->
 
     <!-- Request/Response split -->
     <BaseSplitPane :initial-split="50" class="flex-1">
@@ -89,7 +86,7 @@ async function handleSend() {
       </template>
 
       <template #bottom>
-        <ResponsePanel :response="tab.response" :is-loading="isLoading" />
+        <ResponsePanel :response="tab.response" :request="tab.request" :is-loading="isLoading" :error="error" />
       </template>
     </BaseSplitPane>
   </div>

@@ -39,9 +39,11 @@ const groupedEntries = computed(() => {
 })
 
 function openEntry(entry: HistoryEntry) {
-  const tab = tabsStore.openRequestTab(structuredClone(entry.request), getEntryTitle(entry))
+  const sourceId = `history:${entry.id}`
+  const requestCopy = JSON.parse(JSON.stringify(entry.request))
+  const tab = tabsStore.openRequestTab(requestCopy, getEntryTitle(entry), sourceId)
   if (entry.response) {
-    tabsStore.updateTabResponse(tab.id, entry.response)
+    tabsStore.updateTabResponse(tab.id, JSON.parse(JSON.stringify(entry.response)))
   }
 }
 

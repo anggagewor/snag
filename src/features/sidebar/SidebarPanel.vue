@@ -170,17 +170,6 @@ function handleNewFolderInCollection() {
       <!-- Environments quick view -->
       <div v-else-if="activeSection === 'envs'" class="p-2">
         <div class="space-y-2">
-          <div v-if="environmentsStore.activeEnvironment" class="px-2 py-2 bg-success/5 border border-success/20 rounded text-xs">
-            <div class="flex items-center gap-1.5">
-              <span class="w-2 h-2 rounded-full bg-success" />
-              <span class="font-medium text-primary">{{ environmentsStore.activeEnvironment.name }}</span>
-              <span class="ml-auto text-[10px] text-muted">active</span>
-            </div>
-          </div>
-          <div v-else class="px-2 py-2 text-xs text-muted">
-            No active environment
-          </div>
-
           <!-- List all environments -->
           <div class="space-y-0.5">
             <div
@@ -196,6 +185,10 @@ function handleNewFolderInCollection() {
               />
               <span class="truncate">{{ env.name }}</span>
             </div>
+          </div>
+
+          <div v-if="environmentsStore.environments.length === 0" class="px-2 py-2 text-xs text-muted">
+            No environments yet
           </div>
 
           <button

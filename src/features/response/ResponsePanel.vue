@@ -1,15 +1,17 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 
-import type { ResponseData } from '@/types/request'
+import type { RequestConfig, ResponseData } from '@/types/request'
 import BaseBadge from '@/components/base/BaseBadge.vue'
 
 const props = defineProps<{
   response?: ResponseData | null
+  request?: RequestConfig | null
   isLoading?: boolean
+  error?: string | null
 }>()
 
-const activeTab = ref<'body' | 'headers'>('body')
+const activeTab = ref<'body' | 'headers' | 'console'>('body')
 const bodyView = ref<'pretty' | 'raw'>('pretty')
 const copied = ref(false)
 
@@ -74,11 +76,22 @@ async function copyBody() {
     <!-- Response empty state -->
     <div v-else-if="!response" class="flex-1 flex items-center justify-center">
       <div class="text-center">
-        <svg class="w-10 h-10 mx-auto text-muted/30 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M13 10V3L4 14h7v7l9-11h-7z" />
-        </svg>
-        <p class="text-sm text-muted">Send a request to see the response</p>
-        <p class="text-xs text-muted mt-0.5">Cmd+Enter to send</p>
+        <!-- Error state -->
+        <template v-if="error">
+          <svg class="w-10 h-10 mx-auto text-error/60 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+          </svg>
+          <p class="text-sm text-error font-medium">Request Failed</p>
+          <p class="text-xs text-error/80 mt-1 max-w-[300px]">{{ error }}</p>
+        </template>
+        <!-- Normal empty state -->
+        <template v-else>
+          <svg class="w-10 h-10 mx-auto text-muted/30 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M13 10V3L4 14h7v7l9-11h-7z" />
+          </svg>
+          <p class="text-sm text-muted">Send a request to see the response</p>
+          <p class="text-xs text-muted mt-0.5">Cmd+Enter to send</p>
+        </template>
       </div>
     </div>
 
@@ -120,6 +133,13 @@ async function copyBody() {
           @click="activeTab = 'headers'"
         >
           Headers ({{ Object.keys(response.headers).length }})
+        </button>
+        <button
+          class="px-3 py-2 text-xs font-medium border-b-2 transition-colors"
+          :class="activeTab === 'console' ? 'border-accent text-primary' : 'border-transparent text-secondary'"
+          @click="activeTab = 'console'"
+        >
+          Console
         </button>
 
         <!-- Actions -->
@@ -178,7 +198,7 @@ async function copyBody() {
         </div>
 
         <!-- Headers -->
-        <div v-else class="p-3">
+        <div v-else-if="activeTab === 'headers'" class="p-3">
           <table class="w-full text-xs">
             <tbody>
               <tr
@@ -191,6 +211,84 @@ async function copyBody() {
               </tr>
             </tbody>
           </table>
+        </div>
+
+        <!-- Console -->
+        <div v-else-if="activeTab === 'console'" class="p-3 space-y-3">
+          <div v-if="response && request">
+            <!-- Request summary -->
+            <div class="border border-border rounded overflow-hidden">
+              <div class="px-3 py-2 bg-surface-alt border-b border-border flex items-center gap-2">
+                <span class="text-[10px] font-medium text-muted uppercase tracking-wider">Request</span>
+                <span class="ml-auto text-[10px] text-muted">{{ response.time }}ms</span>
+              </div>
+              <div class="p-3 space-y-2 text-xs">
+                <div class="flex items-center gap-2">
+                  <span class="font-mono font-semibold text-accent">{{ request.method }}</span>
+                  <span class="font-mono text-primary break-all">{{ request.url }}</span>
+                </div>
+                <!-- Request headers sent -->
+                <div v-if="request.headers.filter(h => h.enabled && h.key).length > 0">
+                  <div class="text-[10px] text-muted uppercase mt-2 mb-1">Request Headers</div>
+                  <div class="space-y-0.5">
+                    <div
+                      v-for="h in request.headers.filter(h => h.enabled && h.key)"
+                      :key="h.id"
+                      class="flex gap-2 font-mono text-[11px]"
+                    >
+                      <span class="text-secondary">{{ h.key }}:</span>
+                      <span class="text-primary">{{ h.value }}</span>
+                    </div>
+                  </div>
+                </div>
+                <!-- Request body -->
+                <div v-if="request.body.type !== 'none' && request.body.raw">
+                  <div class="text-[10px] text-muted uppercase mt-2 mb-1">Request Body</div>
+                  <pre class="text-[11px] font-mono text-primary bg-surface-alt rounded p-2 max-h-[100px] overflow-auto whitespace-pre-wrap break-all">{{ request.body.raw }}</pre>
+                </div>
+              </div>
+            </div>
+
+            <!-- Response summary -->
+            <div class="border border-border rounded overflow-hidden">
+              <div class="px-3 py-2 bg-surface-alt border-b border-border flex items-center gap-2">
+                <span class="text-[10px] font-medium text-muted uppercase tracking-wider">Response</span>
+                <BaseBadge :variant="statusVariant" class="ml-auto">
+                  {{ response.status }} {{ response.statusText }}
+                </BaseBadge>
+              </div>
+              <div class="p-3 space-y-2 text-xs">
+                <!-- Response meta -->
+                <div class="flex items-center gap-4 text-[11px] text-secondary">
+                  <span>Status: <span class="text-primary">{{ response.status }} {{ response.statusText }}</span></span>
+                  <span>Time: <span class="text-primary">{{ response.time }}ms</span></span>
+                  <span>Size: <span class="text-primary">{{ formatSize(response.size) }}</span></span>
+                </div>
+                <!-- Response headers -->
+                <div>
+                  <div class="text-[10px] text-muted uppercase mt-2 mb-1">Response Headers</div>
+                  <div class="space-y-0.5">
+                    <div
+                      v-for="(value, key) in response.headers"
+                      :key="key"
+                      class="flex gap-2 font-mono text-[11px]"
+                    >
+                      <span class="text-secondary">{{ key }}:</span>
+                      <span class="text-primary break-all">{{ value }}</span>
+                    </div>
+                  </div>
+                </div>
+                <!-- Response body preview -->
+                <div>
+                  <div class="text-[10px] text-muted uppercase mt-2 mb-1">Response Body (preview)</div>
+                  <pre class="text-[11px] font-mono text-primary bg-surface-alt rounded p-2 max-h-[150px] overflow-auto whitespace-pre-wrap break-all">{{ response.body.slice(0, 2000) }}{{ response.body.length > 2000 ? '\n... (truncated)' : '' }}</pre>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div v-else class="text-xs text-muted text-center py-4">
+            No console entries yet. Send a request to see full details here.
+          </div>
         </div>
       </div>
     </template>
