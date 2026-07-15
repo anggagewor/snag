@@ -29,6 +29,7 @@ A fast, lightweight native API client built with Tauri 2, Vue 3, and TypeScript.
 <p align="center">
   ⚡ Native • 🚀 Fast • 💾 Local First • 🔥 Zero Electron
 </p>
+
 ---
 
 
