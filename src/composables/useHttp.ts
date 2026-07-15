@@ -7,10 +7,10 @@ import type { KeyValuePair } from '@/types/common'
 
 const isTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window
 
-async function doFetch(url: string, init: RequestInit): Promise<Response> {
+async function doFetch(url: string, init: RequestInit & { dangerAcceptInvalidCerts?: boolean }): Promise<Response> {
   if (isTauri) {
     const { fetch: tauriFetch } = await import('@tauri-apps/plugin-http')
-    return tauriFetch(url, init)
+    return tauriFetch(url, init as Parameters<typeof tauriFetch>[1])
   }
   return globalThis.fetch(url, init)
 }
@@ -140,6 +140,7 @@ export function useHttp() {
 
       const headers = buildHeaders(request)
       const body = await buildBody(request)
+      const settingsStore = useSettingsStore()
 
       // Set content-type for JSON
       if (request.body.type === 'json' && !headers['Content-Type']) {
@@ -153,6 +154,7 @@ export function useHttp() {
         method: request.method,
         headers,
         body: body as BodyInit | undefined,
+        dangerAcceptInvalidCerts: !settingsStore.settings.verifySSL,
       })
 
       const endTime = performance.now()

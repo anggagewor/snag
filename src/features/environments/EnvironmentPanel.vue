@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 
-import { Plus, X, Check, Pencil, Trash2, FlaskConical } from 'lucide-vue-next'
+import { Plus, X, Check, Pencil, Trash2, FlaskConical, Download } from 'lucide-vue-next'
 
 import { useEnvironmentsStore } from '@/stores/environments'
+import { exportToPostmanEnvironment } from '@/utils/export-environment'
 import type { EnvironmentVariable } from '@/types/environment'
 import type { UUID } from '@/types/common'
 import BaseButton from '@/components/base/BaseButton.vue'
@@ -97,6 +98,38 @@ function removeVariable(index: number) {
   const vars = selectedEnv.value.variables.filter((_, i) => i !== index)
   environmentsStore.updateEnvironment(selectedEnv.value.id, { variables: vars })
 }
+
+const isTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window
+
+async function exportEnv(id: UUID) {
+  const env = environmentsStore.environments.find((e) => e.id === id)
+  if (!env) return
+
+  const postmanJson = exportToPostmanEnvironment(env)
+  const content = JSON.stringify(postmanJson, null, 2)
+  const fileName = `${env.name.replace(/[^a-zA-Z0-9-_]/g, '_')}.postman_environment.json`
+
+  if (isTauri) {
+    const { save } = await import('@tauri-apps/plugin-dialog')
+    const { writeTextFile } = await import('@tauri-apps/plugin-fs')
+    const filePath = await save({
+      title: 'Export Environment',
+      defaultPath: fileName,
+      filters: [{ name: 'JSON', extensions: ['json'] }],
+    })
+    if (filePath) {
+      await writeTextFile(filePath, content)
+    }
+  } else {
+    const blob = new Blob([content], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = fileName
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+}
 </script>
 
 <template>
@@ -153,6 +186,13 @@ function removeVariable(index: number) {
               <Pencil class="w-3 h-3" />
             </button>
             <button
+              class="p-0.5 text-muted hover:text-primary rounded"
+              title="Export"
+              @click="exportEnv(env.id)"
+            >
+              <Download class="w-3 h-3" />
+            </button>
+            <button
               class="p-0.5 text-muted hover:text-error rounded"
               title="Delete"
               @click="deleteEnv(env.id)"
@@ -187,12 +227,22 @@ function removeVariable(index: number) {
               Use <code class="px-1 py-0.5 rounded bg-surface-alt font-mono">{{ syntaxHint }}</code> syntax in requests
             </p>
           </div>
-          <BaseBadge
-            v-if="environmentsStore.activeEnvironmentId === selectedEnv.id"
-            variant="success"
-          >
-            Active
-          </BaseBadge>
+          <div class="flex items-center gap-2">
+            <button
+              class="flex items-center gap-1 px-2 py-1 text-xs text-muted hover:text-primary hover:bg-surface-hover rounded transition-colors"
+              title="Export as Postman Environment"
+              @click="exportEnv(selectedEnv.id)"
+            >
+              <Download class="w-3.5 h-3.5" />
+              Export
+            </button>
+            <BaseBadge
+              v-if="environmentsStore.activeEnvironmentId === selectedEnv.id"
+              variant="success"
+            >
+              Active
+            </BaseBadge>
+          </div>
         </div>
 
         <!-- Variables table -->

@@ -17,6 +17,7 @@ export interface AppSettings {
   theme: ThemeMode
   defaultMethod: string
   followRedirects: boolean
+  verifySSL: boolean
   timeout: number // seconds
   maxHistoryItems: number
   sidebarWidth: number
@@ -27,6 +28,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   theme: 'system',
   defaultMethod: 'GET',
   followRedirects: true,
+  verifySSL: true,
   timeout: 30,
   maxHistoryItems: 100,
   sidebarWidth: 280,
