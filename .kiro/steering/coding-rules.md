@@ -115,6 +115,76 @@ import { formatBytes } from '@/utils/formatters'
 - Debounce input yang trigger expensive operations (search, env variable resolution)
 - `v-once` untuk static content
 
+## Anti-patterns
+
+The following patterns are prohibited:
+
+- Creating duplicate components or composables.
+- Mutating Pinia state outside store actions.
+- Calling Tauri plugins directly from Vue components.
+- Using browser `fetch()` or introducing `axios`.
+- Using `localStorage` for persistence.
+- Bypassing `useHttp()` or `useStorage()`.
+
+## Architecture Rules
+
+Before creating a new:
+
+- component
+- composable
+- utility
+- store
+
+Always search for an existing implementation first.
+
+Prefer extending existing modules over creating parallel ones.
+
+Do not redesign the architecture unless explicitly requested.
+
+## Implementation Workflow
+
+For non-trivial tasks:
+
+1. Identify the affected modules.
+2. Reuse existing code whenever possible.
+3. Explain the implementation plan before making architectural changes.
+4. Keep changes localized.
+
+## Decision Making
+
+When multiple implementations are possible:
+
+1. Reuse existing code.
+2. Prefer consistency over novelty.
+3. Prefer extending existing modules.
+4. Minimize new files.
+5. Minimize public API changes.
+6. Preserve existing architecture.
+
+## Code Quality
+
+- Keep functions focused on a single responsibility.
+- Prefer composition over inheritance.
+- Prefer explicit code over clever abstractions.
+- Remove dead code instead of leaving commented code.
+- Avoid premature optimization.
+
+## Existing Code First
+
+Before writing any code:
+
+1. Search the existing codebase.
+2. Prefer modifying existing files over creating new ones.
+3. Create a new file only when there is no appropriate place for the implementation.
+4. Avoid introducing duplicate abstractions.
+
+## Comments
+
+- Do not add comments that describe obvious code.
+- Prefer self-explanatory code.
+- Add comments only to explain non-obvious business logic or architectural decisions.
+- Remove outdated comments when modifying code.
+
 ## Git & Commits
 
 - Conventional commits: `feat:`, `fix:`, `refactor:`, `chore:`, `docs:`

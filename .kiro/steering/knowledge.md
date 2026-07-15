@@ -170,6 +170,82 @@ Error:       text-error / bg-error               → 5xx, errors
 }
 ```
 
+## State Ownership
+
+Collections Store
+- owns collections
+- owns folder tree
+
+Tabs Store
+- owns opened tabs
+- owns active request state
+- owns dirty state
+
+History Store
+- owns request history
+
+Environment Store
+- owns environments
+- owns variables
+
+Settings Store
+- owns user preferences
+
+Components never own application state.
+
+## Data Flow
+
+UI Components
+    ↓
+Feature Components
+    ↓
+Pinia Store Actions
+    ↓
+Composables
+    ↓
+Tauri Plugins
+    ↓
+Filesystem / HTTP
+
+Never call Tauri plugins directly from UI components.
+
+## Source of Truth
+
+Collections
+→ collections store
+
+Tabs
+→ tabs store
+
+History
+→ history store
+
+Environment variables
+→ environments store
+
+HTTP execution
+→ useHttp()
+
+Persistence
+→ useStorage()
+
+## Extension Points
+
+New authentication methods
+→ features/request/RequestAuth.vue
+
+New request body types
+→ features/request/
+
+New import formats
+→ utils/import-*.ts
+
+HTTP middleware
+→ composables/useHttp.ts
+
+Persistence
+→ composables/useStorage.ts
+
 ## Notes / Backlog Ideas
 
 - Code editor integration (Monaco/CodeMirror) untuk body editing & scripts
