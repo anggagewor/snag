@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 
+import { Plus, X, Check, Pencil, Trash2, FlaskConical } from 'lucide-vue-next'
+
 import { useEnvironmentsStore } from '@/stores/environments'
 import type { EnvironmentVariable } from '@/types/environment'
 import type { UUID } from '@/types/common'
@@ -104,9 +106,7 @@ function removeVariable(index: number) {
       <div class="flex items-center justify-between px-3 py-2 border-b border-border">
         <span class="text-xs font-medium text-muted uppercase tracking-wide">Environments</span>
         <BaseButton variant="ghost" size="sm" @click="createEnv">
-          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
-          </svg>
+          <Plus class="w-3.5 h-3.5" />
         </BaseButton>
       </div>
 
@@ -143,27 +143,21 @@ function removeVariable(index: number) {
               title="Set as active"
               @click="setActive(environmentsStore.activeEnvironmentId === env.id ? null : env.id)"
             >
-              <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
-              </svg>
+              <Check class="w-3 h-3" />
             </button>
             <button
               class="p-0.5 text-muted hover:text-primary rounded"
               title="Rename"
               @click="startRename(env.id, env.name)"
             >
-              <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-              </svg>
+              <Pencil class="w-3 h-3" />
             </button>
             <button
               class="p-0.5 text-muted hover:text-error rounded"
               title="Delete"
               @click="deleteEnv(env.id)"
             >
-              <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-              </svg>
+              <Trash2 class="w-3 h-3" />
             </button>
           </div>
         </div>
@@ -178,9 +172,7 @@ function removeVariable(index: number) {
     <div class="flex-1 flex flex-col">
       <div v-if="!selectedEnv" class="flex-1 flex items-center justify-center">
         <div class="text-center">
-          <svg class="w-10 h-10 mx-auto text-muted/30 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
-          </svg>
+          <FlaskConical class="w-10 h-10 mx-auto text-muted/30 mb-2" :stroke-width="1.5" />
           <p class="text-sm text-muted">Select an environment</p>
           <p class="text-xs text-muted mt-0.5">or create a new one</p>
         </div>
@@ -250,9 +242,7 @@ function removeVariable(index: number) {
                 class="text-muted hover:text-error opacity-0 group-hover:opacity-100 transition-opacity"
                 @click="removeVariable(index)"
               >
-                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                </svg>
+                <X class="w-3.5 h-3.5" />
               </button>
             </div>
           </div>

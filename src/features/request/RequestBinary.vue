@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 
+import { CloudUpload, CheckCircle } from 'lucide-vue-next'
+
 import { useTabsStore } from '@/stores/tabs'
 import type { Tab } from '@/stores/tabs'
 
@@ -45,9 +47,7 @@ function clearFile() {
   <div class="flex flex-col items-center justify-center h-full">
     <div v-if="!filePath" class="text-center">
       <div class="w-16 h-16 mx-auto mb-3 rounded-full bg-surface-alt border-2 border-dashed border-border flex items-center justify-center">
-        <svg class="w-7 h-7 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-        </svg>
+        <CloudUpload class="w-7 h-7 text-muted" :stroke-width="1.5" />
       </div>
       <p class="text-sm text-primary mb-1">Select a file to upload</p>
       <p class="text-xs text-muted mb-3">The file will be sent as raw binary in the request body</p>
@@ -61,9 +61,7 @@ function clearFile() {
 
     <div v-else class="text-center">
       <div class="w-16 h-16 mx-auto mb-3 rounded-full bg-success/10 flex items-center justify-center">
-        <svg class="w-7 h-7 text-success" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-        </svg>
+        <CheckCircle class="w-7 h-7 text-success" :stroke-width="1.5" />
       </div>
       <p class="text-sm font-medium text-primary mb-0.5">{{ fileName }}</p>
       <p class="text-xs text-muted font-mono mb-3 max-w-[400px] truncate">{{ filePath }}</p>

@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { X, Plus } from 'lucide-vue-next'
+
 import { useSettingsStore } from '@/stores/settings'
 import { useTheme } from '@/composables/useTheme'
 import type { ThemeMode } from '@/types/common'
@@ -179,9 +181,7 @@ function addDefaultHeader() {
             class="text-muted hover:text-error transition-colors"
             @click="removeDefaultHeader(index)"
           >
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-            </svg>
+            <X class="w-4 h-4" />
           </button>
         </div>
 
@@ -189,9 +189,7 @@ function addDefaultHeader() {
           class="flex items-center gap-1.5 px-3 py-1.5 text-xs text-muted hover:text-primary transition-colors"
           @click="addDefaultHeader"
         >
-          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
-          </svg>
+          <Plus class="w-3.5 h-3.5" />
           Add Header
         </button>
       </div>

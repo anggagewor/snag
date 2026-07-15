@@ -140,11 +140,19 @@ npx vue-tsc --noEmit
 
 ## Roadmap
 
-- [ ] Export collection (Postman format)
-- [ ] Pre-request scripts & tests
-- [ ] Code editor (Monaco/CodeMirror) for body & scripts
-- [ ] Response syntax highlighting
-- [ ] Cookie jar management
-- [ ] Proxy settings
-- [ ] Certificate management (mTLS)
-- [ ] Request chaining
+### Phase 1 — Export & Editor Foundation
+- [x] Export collection (Postman v2.1 format)
+- [x] Code editor integration (CodeMirror) for body editing & scripts
+
+### Phase 2 — Scripting & Highlighting
+- [ ] Pre-request scripts & post-response tests (sandboxed JS runtime)
+- [x] Response body syntax highlighting (JSON, HTML, XML)
+
+### Phase 3 — Keyboard & UX Polish
+- [x] Keyboard shortcuts (Cmd+T new tab, Cmd+W close, Cmd+S save, Cmd+Enter send, Cmd+B toggle sidebar)
+
+### Phase 4 — Advanced Networking
+- [ ] Cookie jar management (auto Set-Cookie handling per domain)
+- [ ] Proxy settings (HTTP/SOCKS proxy config)
+- [ ] Certificate management (mTLS client certs)
+- [ ] Request chaining (use response values as input to next request)

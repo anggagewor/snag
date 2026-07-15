@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { onMounted } from 'vue'
+import { onMounted, ref } from 'vue'
 
 import { useTheme } from '@/composables/useTheme'
+import { useKeyboard } from '@/composables/useKeyboard'
 import { useCollectionsStore } from '@/stores/collections'
 import { useEnvironmentsStore } from '@/stores/environments'
 import { useHistoryStore } from '@/stores/history'
@@ -13,6 +14,26 @@ import TabContent from '@/features/tabs/TabContent.vue'
 
 // Initialize theme
 const { loadTheme } = useTheme()
+
+// Register keyboard shortcuts
+useKeyboard()
+
+// Layout ref for sidebar toggle
+const layoutRef = ref<InstanceType<typeof DefaultLayout> | null>(null)
+
+function handleToggleSidebar() {
+  layoutRef.value?.toggleSidebar()
+}
+
+// Expose sidebar toggle to keyboard
+onMounted(() => {
+  window.addEventListener('keydown', (e) => {
+    if ((e.metaKey || e.ctrlKey) && e.key === 'b') {
+      e.preventDefault()
+      handleToggleSidebar()
+    }
+  })
+})
 
 // Load persisted data
 const collectionsStore = useCollectionsStore()
@@ -32,7 +53,7 @@ onMounted(async () => {
 </script>
 
 <template>
-  <DefaultLayout>
+  <DefaultLayout ref="layoutRef">
     <template #sidebar>
       <SidebarPanel />
     </template>

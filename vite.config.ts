@@ -14,6 +14,28 @@ export default defineConfig(async () => ({
       "@": resolve(__dirname, "src"),
     },
   },
+  build: {
+    chunkSizeWarningLimit: 600,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          codemirror: [
+            'codemirror',
+            '@codemirror/lang-json',
+            '@codemirror/lang-javascript',
+            '@codemirror/lang-html',
+            '@codemirror/lang-xml',
+            '@codemirror/theme-one-dark',
+            '@codemirror/view',
+            '@codemirror/state',
+            '@codemirror/language',
+            '@codemirror/autocomplete',
+            '@codemirror/search',
+          ],
+        },
+      },
+    },
+  },
 
   // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`
   //

@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 
+import { Ban } from 'lucide-vue-next'
+
 import { useTabsStore } from '@/stores/tabs'
 import type { Tab } from '@/stores/tabs'
 import type { AuthType, AuthConfig } from '@/types/request'
@@ -64,9 +66,7 @@ function updateAuth(updates: Partial<AuthConfig>) {
       <!-- No Auth -->
       <div v-if="auth.type === 'none'" class="flex items-center justify-center h-full">
         <div class="text-center">
-          <svg class="w-10 h-10 mx-auto text-muted/40 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
-          </svg>
+          <Ban class="w-10 h-10 mx-auto text-muted/40 mb-2" :stroke-width="1.5" />
           <p class="text-sm text-muted">No authorization</p>
           <p class="text-xs text-muted mt-0.5">This request won't send any auth headers</p>
         </div>

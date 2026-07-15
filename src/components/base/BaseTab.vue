@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { X } from 'lucide-vue-next'
+
 defineProps<{
   active?: boolean
   closable?: boolean
@@ -24,9 +26,7 @@ defineEmits<{
       class="ml-1 rounded-sm p-0.5 hover:bg-surface-hover text-muted hover:text-primary"
       @click.stop="$emit('close')"
     >
-      <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-      </svg>
+      <X class="w-3 h-3" />
     </span>
   </button>
 </template>

@@ -1,9 +1,13 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 
+import { Loader2, AlertTriangle, Zap, Clock, Database, Copy } from 'lucide-vue-next'
+
 import type { RequestConfig, ResponseData } from '@/types/request'
 import { formatBytes } from '@/utils/formatters'
 import BaseBadge from '@/components/base/BaseBadge.vue'
+import BaseCodeEditor from '@/components/base/BaseCodeEditor.vue'
+import type { EditorLanguage } from '@/components/base/BaseCodeEditor.vue'
 
 const props = defineProps<{
   response?: ResponseData | null
@@ -45,7 +49,15 @@ const formattedBody = computed(() => {
   return props.response.body
 })
 
-const bodyLines = computed(() => formattedBody.value.split('\n'))
+const responseLanguage = computed((): EditorLanguage => {
+  if (!props.response) return 'text'
+  const ct = props.response.headers['content-type'] || ''
+  if (ct.includes('json')) return 'json'
+  if (ct.includes('html')) return 'html'
+  if (ct.includes('xml')) return 'xml'
+  if (ct.includes('javascript')) return 'javascript'
+  return 'text'
+})
 
 async function copyBody() {
   if (!props.response) return
@@ -60,10 +72,7 @@ async function copyBody() {
     <!-- Loading state -->
     <div v-if="isLoading" class="flex-1 flex items-center justify-center">
       <div class="text-center">
-        <svg class="w-8 h-8 mx-auto animate-spin text-accent mb-2" fill="none" viewBox="0 0 24 24">
-          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
-          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-        </svg>
+        <Loader2 class="w-8 h-8 mx-auto animate-spin text-accent mb-2" />
         <p class="text-sm text-muted">Sending request...</p>
       </div>
     </div>
@@ -73,17 +82,13 @@ async function copyBody() {
       <div class="text-center">
         <!-- Error state -->
         <template v-if="error">
-          <svg class="w-10 h-10 mx-auto text-error/60 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-          </svg>
+          <AlertTriangle class="w-10 h-10 mx-auto text-error/60 mb-2" :stroke-width="1.5" />
           <p class="text-sm text-error font-medium">Request Failed</p>
           <p class="text-xs text-error/80 mt-1 max-w-[300px]">{{ error }}</p>
         </template>
         <!-- Normal empty state -->
         <template v-else>
-          <svg class="w-10 h-10 mx-auto text-muted/30 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M13 10V3L4 14h7v7l9-11h-7z" />
-          </svg>
+          <Zap class="w-10 h-10 mx-auto text-muted/30 mb-2" :stroke-width="1.5" />
           <p class="text-sm text-muted">Send a request to see the response</p>
           <p class="text-xs text-muted mt-0.5">Cmd+Enter to send</p>
         </template>
@@ -99,15 +104,11 @@ async function copyBody() {
         </BaseBadge>
         <div class="flex items-center gap-3 text-xs text-secondary">
           <span class="flex items-center gap-1">
-            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
+            <Clock class="w-3 h-3" />
             {{ response.time }}ms
           </span>
           <span class="flex items-center gap-1">
-            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4" />
-            </svg>
+            <Database class="w-3 h-3" />
             {{ formatBytes(response.size) }}
           </span>
         </div>
@@ -164,9 +165,7 @@ async function copyBody() {
           >
             <span v-if="copied" class="text-success">Copied!</span>
             <span v-else class="flex items-center gap-1">
-              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-              </svg>
+              <Copy class="w-3.5 h-3.5" />
               Copy
             </span>
           </button>
@@ -177,19 +176,11 @@ async function copyBody() {
       <div class="flex-1 overflow-auto">
         <!-- Body -->
         <div v-if="activeTab === 'body'" class="h-full relative">
-          <!-- Line numbers + body -->
-          <div class="flex h-full">
-            <!-- Line numbers -->
-            <div class="flex-shrink-0 w-10 bg-surface-alt border-r border-border pt-3 pb-3 text-right pr-2 select-none overflow-hidden">
-              <div
-                v-for="n in bodyLines.length"
-                :key="n"
-                class="text-[10px] leading-[18px] text-muted font-mono"
-              >{{ n }}</div>
-            </div>
-            <!-- Body content -->
-            <pre class="flex-1 text-xs font-mono text-primary p-3 overflow-auto leading-[18px] whitespace-pre-wrap break-all">{{ formattedBody }}</pre>
-          </div>
+          <BaseCodeEditor
+            :model-value="formattedBody"
+            :language="responseLanguage"
+            :readonly="true"
+          />
         </div>
 
         <!-- Headers -->

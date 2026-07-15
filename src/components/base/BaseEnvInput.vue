@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { ref, computed, watch, nextTick, onMounted, onBeforeUnmount } from 'vue'
 
+import { Plus, Pencil } from 'lucide-vue-next'
+
 import { useEnvironmentsStore } from '@/stores/environments'
 import BaseModal from '@/components/base/BaseModal.vue'
 
@@ -262,9 +264,7 @@ defineExpose({ inputRef })
               class="flex-shrink-0 p-0.5 text-muted hover:text-accent rounded opacity-0 group-hover/var:opacity-100"
               @mousedown.prevent="openEditModal(varName)"
             >
-              <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-              </svg>
+              <Pencil class="w-3 h-3" />
             </button>
           </div>
         </div>
@@ -277,9 +277,7 @@ defineExpose({ inputRef })
             @mousedown.prevent="openCreateModal"
             @mouseenter="highlightIndex = suggestions.length"
           >
-            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
-            </svg>
+            <Plus class="w-3.5 h-3.5" />
             <span>Create "<span class="font-mono">{{ variableContext?.query }}</span>"</span>
           </button>
         </div>

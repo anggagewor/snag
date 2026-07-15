@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 
+import { X, Clock } from 'lucide-vue-next'
+
 import { useHistoryStore } from '@/stores/history'
 import { useTabsStore } from '@/stores/tabs'
 import type { HistoryEntry } from '@/stores/history'
@@ -88,9 +90,7 @@ function getStatusVariant(status: number | undefined): 'success' | 'warning' | '
     <!-- Empty state -->
     <div v-if="historyStore.entries.length === 0" class="flex-1 flex items-center justify-center">
       <div class="text-center">
-        <svg class="w-10 h-10 mx-auto text-muted/30 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-        </svg>
+        <Clock class="w-10 h-10 mx-auto text-muted/30 mb-2" :stroke-width="1.5" />
         <p class="text-sm text-muted">No history yet</p>
         <p class="text-xs text-muted mt-0.5">Requests will appear here after you send them</p>
       </div>
@@ -125,9 +125,7 @@ function getStatusVariant(status: number | undefined): 'success' | 'warning' | '
               class="text-muted hover:text-error opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"
               @click.stop="historyStore.removeEntry(entry.id)"
             >
-              <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-              </svg>
+              <X class="w-3 h-3" />
             </button>
           </div>
         </div>

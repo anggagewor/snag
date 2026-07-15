@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 
+import { AlignLeft, Ban } from 'lucide-vue-next'
+
 import { useTabsStore } from '@/stores/tabs'
 import type { BodyType } from '@/types/request'
 import type { Tab } from '@/stores/tabs'
@@ -8,6 +10,8 @@ import type { KeyValuePair } from '@/types/common'
 import BaseKeyValueEditor from '@/components/base/BaseKeyValueEditor.vue'
 import BaseSelect from '@/components/base/BaseSelect.vue'
 import type { SelectOption } from '@/components/base/BaseSelect.vue'
+import BaseCodeEditor from '@/components/base/BaseCodeEditor.vue'
+import type { EditorLanguage } from '@/components/base/BaseCodeEditor.vue'
 import RequestFormData from './RequestFormData.vue'
 import RequestBinary from './RequestBinary.vue'
 
@@ -33,7 +37,7 @@ const rawLanguageOptions: SelectOption[] = [
   { label: 'XML', value: 'xml' },
 ]
 
-const rawLanguage = ref('text')
+const rawLanguage = ref<EditorLanguage>('text')
 
 const currentBody = computed(() => props.tab.request?.body)
 
@@ -108,9 +112,7 @@ function formatJson() {
         title="Format JSON"
         @click="formatJson"
       >
-        <svg class="w-4 h-4 inline-block mr-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h8m-8 6h16" />
-        </svg>
+        <AlignLeft class="w-4 h-4 inline-block mr-0.5" />
         Format
       </button>
     </div>
@@ -120,9 +122,7 @@ function formatJson() {
       <!-- None -->
       <div v-if="currentBody?.type === 'none'" class="flex items-center justify-center h-full">
         <div class="text-center">
-          <svg class="w-10 h-10 mx-auto text-muted/40 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
-          </svg>
+          <Ban class="w-10 h-10 mx-auto text-muted/40 mb-2" :stroke-width="1.5" />
           <p class="text-sm text-muted">No body</p>
           <p class="text-xs text-muted mt-0.5">This request does not have a body</p>
         </div>
@@ -130,33 +130,21 @@ function formatJson() {
 
       <!-- JSON editor -->
       <div v-else-if="currentBody?.type === 'json'" class="h-full flex flex-col">
-        <div class="relative flex-1">
-          <!-- Line numbers gutter -->
-          <div class="absolute left-0 top-0 bottom-0 w-8 bg-surface-alt border-r border-border rounded-l-md flex flex-col items-end pr-1.5 pt-3 text-xs text-muted font-mono select-none overflow-hidden">
-            <span
-              v-for="n in (currentBody?.raw || '').split('\n').length"
-              :key="n"
-              class="leading-[20px]"
-            >{{ n }}</span>
-          </div>
-          <textarea
-            :value="currentBody?.raw || ''"
-            placeholder='{ "key": "value" }'
-            class="w-full h-full rounded-md border border-border bg-surface text-primary font-mono text-xs pl-10 pr-3 py-3 resize-none focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent/50 leading-[20px]"
-            spellcheck="false"
-            @input="updateRawBody(($event.target as HTMLTextAreaElement).value)"
-          />
-        </div>
+        <BaseCodeEditor
+          :model-value="currentBody?.raw || ''"
+          language="json"
+          placeholder='{ "key": "value" }'
+          @update:model-value="updateRawBody"
+        />
       </div>
 
       <!-- Raw editor -->
       <div v-else-if="currentBody?.type === 'raw'" class="h-full">
-        <textarea
-          :value="currentBody?.raw || ''"
+        <BaseCodeEditor
+          :model-value="currentBody?.raw || ''"
+          :language="rawLanguage"
           placeholder="Enter raw body content..."
-          class="w-full h-full rounded-md border border-border bg-surface text-primary font-mono text-xs px-3 py-3 resize-none focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent/50 leading-[20px]"
-          spellcheck="false"
-          @input="updateRawBody(($event.target as HTMLTextAreaElement).value)"
+          @update:model-value="updateRawBody"
         />
       </div>
 

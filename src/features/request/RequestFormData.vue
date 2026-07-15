@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 
+import { X } from 'lucide-vue-next'
+
 import { useTabsStore } from '@/stores/tabs'
 import type { Tab } from '@/stores/tabs'
 import type { FormDataField } from '@/types/request'
@@ -189,9 +191,7 @@ async function pickFile(index: number) {
           class="text-muted hover:text-error opacity-0 group-hover:opacity-100 transition-opacity"
           @click="removeRow(index)"
         >
-          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-          </svg>
+          <X class="w-3.5 h-3.5" />
         </button>
       </div>
     </div>
