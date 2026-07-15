@@ -1,16 +1,16 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { provide, ref } from 'vue'
 
 import { useCollectionsStore } from '@/stores/collections'
-import { useTabsStore } from '@/stores/tabs'
 import type { Collection, CollectionItem } from '@/types/collection'
 import type { UUID } from '@/types/common'
 import { createEmptyRequest } from '@/types/request'
-import BaseBadge from '@/components/base/BaseBadge.vue'
 import BaseDropdown from '@/components/base/BaseDropdown.vue'
+import CollectionTreeItem from './CollectionTreeItem.vue'
+
+import type { TreeContext } from './collectionTreeContext'
 
 const collectionsStore = useCollectionsStore()
-const tabsStore = useTabsStore()
 
 const expandedIds = ref<Set<UUID>>(new Set())
 const editingId = ref<UUID | null>(null)
@@ -26,13 +26,6 @@ function toggleExpand(id: UUID) {
 
 function isExpanded(id: UUID): boolean {
   return expandedIds.value.has(id)
-}
-
-function openRequest(item: CollectionItem, collectionId: UUID) {
-  if (item.type === 'request' && item.request) {
-    const sourceId = `${collectionId}:${item.id}`
-    tabsStore.openRequestTab(JSON.parse(JSON.stringify(item.request)), item.name, sourceId)
-  }
 }
 
 function startRename(id: UUID, currentName: string) {
@@ -89,45 +82,39 @@ function duplicateCollection(collection: Collection) {
   }
 }
 
-function duplicateItem(collectionId: UUID, item: CollectionItem) {
-  const clone: CollectionItem = JSON.parse(JSON.stringify(item))
-  clone.id = crypto.randomUUID()
-  clone.name = `${item.name} (copy)`
-  if (clone.request) clone.request.id = crypto.randomUUID()
-  if (clone.items) {
-    function regenIds(items: CollectionItem[]) {
-      for (const i of items) {
-        i.id = crypto.randomUUID()
-        if (i.request) i.request.id = crypto.randomUUID()
-        if (i.items) regenIds(i.items)
-      }
-    }
-    regenIds(clone.items)
-  }
-  collectionsStore.insertAfter(collectionId, item.id, clone)
-}
-
-function addRequestToCollection(collectionId: UUID, parentFolderId?: UUID) {
+function addRequestToCollection(collectionId: UUID) {
   const item: CollectionItem = {
     id: crypto.randomUUID(),
     type: 'request',
     name: 'New Request',
     request: createEmptyRequest(),
   }
-  collectionsStore.addItem(collectionId, item, parentFolderId)
-  expandedIds.value.add(parentFolderId || collectionId)
+  collectionsStore.addItem(collectionId, item)
+  expandedIds.value.add(collectionId)
 }
 
-function addFolderToCollection(collectionId: UUID, parentFolderId?: UUID) {
+function addFolderToCollection(collectionId: UUID) {
   const folder: CollectionItem = {
     id: crypto.randomUUID(),
     type: 'folder',
     name: 'New Folder',
     items: [],
   }
-  collectionsStore.addItem(collectionId, folder, parentFolderId)
-  expandedIds.value.add(parentFolderId || collectionId)
+  collectionsStore.addItem(collectionId, folder)
+  expandedIds.value.add(collectionId)
 }
+
+// Provide tree context for recursive children
+const treeContext: TreeContext = {
+  expandedIds,
+  editingId,
+  editingName,
+  startRename,
+  finishRenameItem,
+  cancelRename,
+}
+
+provide('treeContext', treeContext)
 </script>
 
 <template>
@@ -205,153 +192,12 @@ function addFolderToCollection(collectionId: UUID, parentFolderId?: UUID) {
           Empty collection
         </div>
 
-        <!-- Recursive item rendering -->
-        <template v-for="item in collection.items" :key="item.id">
-          <!-- Folder -->
-          <div v-if="item.type === 'folder'">
-            <div
-              class="flex items-center gap-1 px-2 py-1 rounded text-xs hover:bg-surface-hover cursor-pointer group/item"
-              @click="toggleExpand(item.id)"
-            >
-              <svg
-                class="w-3 h-3 text-muted transition-transform flex-shrink-0"
-                :class="{ 'rotate-90': isExpanded(item.id) }"
-                fill="none" stroke="currentColor" viewBox="0 0 24 24"
-              >
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
-              </svg>
-              <svg class="w-3.5 h-3.5 text-muted flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
-              </svg>
-
-              <input
-                v-if="editingId === item.id"
-                v-model="editingName"
-                class="flex-1 bg-surface border border-accent rounded px-1 py-0.5 text-xs text-primary focus:outline-none"
-                @keydown.enter="finishRenameItem(collection.id, item.id)"
-                @keydown.escape="cancelRename"
-                @blur="finishRenameItem(collection.id, item.id)"
-                @click.stop
-              />
-              <span v-else class="flex-1 truncate text-primary">{{ item.name }}</span>
-
-              <!-- Folder menu -->
-              <div class="opacity-0 group-hover/item:opacity-100 transition-opacity" @click.stop>
-                <BaseDropdown align="right">
-                  <template #trigger>
-                    <button class="p-0.5 text-muted hover:text-primary rounded">
-                      <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
-                      </svg>
-                    </button>
-                  </template>
-                  <template #content="{ close }">
-                    <button class="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-primary hover:bg-surface-hover text-left" @click="addRequestToCollection(collection.id, item.id); close()">
-                      Add Request
-                    </button>
-                    <button class="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-primary hover:bg-surface-hover text-left" @click="addFolderToCollection(collection.id, item.id); close()">
-                      Add Folder
-                    </button>
-                    <div class="border-t border-border my-0.5" />
-                    <button class="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-primary hover:bg-surface-hover text-left" @click="startRename(item.id, item.name); close()">
-                      Rename
-                    </button>
-                    <button class="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-primary hover:bg-surface-hover text-left" @click="duplicateItem(collection.id, item); close()">
-                      Duplicate
-                    </button>
-                    <div class="border-t border-border my-0.5" />
-                    <button class="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-error hover:bg-error/5 text-left" @click="collectionsStore.removeItem(collection.id, item.id); close()">
-                      Delete
-                    </button>
-                  </template>
-                </BaseDropdown>
-              </div>
-            </div>
-
-            <!-- Folder children -->
-            <div v-if="isExpanded(item.id)" class="ml-3 border-l border-border-muted pl-2 space-y-0.5">
-              <div v-if="!item.items || item.items.length === 0" class="px-2 py-1 text-[10px] text-muted">
-                Empty folder
-              </div>
-              <div
-                v-for="child in item.items"
-                :key="child.id"
-                class="flex items-center gap-1.5 px-2 py-1 rounded text-xs hover:bg-surface-hover cursor-pointer group/child"
-                @click="openRequest(child, collection.id)"
-              >
-                <template v-if="child.type === 'request' && child.request">
-                  <BaseBadge :method="child.request.method" />
-                  <input
-                    v-if="editingId === child.id"
-                    v-model="editingName"
-                    class="flex-1 bg-surface border border-accent rounded px-1 py-0.5 text-xs text-primary focus:outline-none"
-                    @keydown.enter="finishRenameItem(collection.id, child.id)"
-                    @keydown.escape="cancelRename"
-                    @blur="finishRenameItem(collection.id, child.id)"
-                    @click.stop
-                  />
-                  <span v-else class="text-primary flex-1 truncate">{{ child.name }}</span>
-                </template>
-                <!-- Child menu -->
-                <div class="opacity-0 group-hover/child:opacity-100 transition-opacity" @click.stop>
-                  <BaseDropdown align="right">
-                    <template #trigger>
-                      <button class="p-0.5 text-muted hover:text-primary rounded">
-                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
-                        </svg>
-                      </button>
-                    </template>
-                    <template #content="{ close }">
-                      <button class="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-primary hover:bg-surface-hover text-left" @click="startRename(child.id, child.name); close()">Rename</button>
-                      <button class="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-primary hover:bg-surface-hover text-left" @click="duplicateItem(collection.id, child); close()">Duplicate</button>
-                      <div class="border-t border-border my-0.5" />
-                      <button class="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-error hover:bg-error/5 text-left" @click="collectionsStore.removeItem(collection.id, child.id); close()">Delete</button>
-                    </template>
-                  </BaseDropdown>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Request (top level) -->
-          <div
-            v-else-if="item.type === 'request' && item.request"
-            class="flex items-center gap-1.5 px-2 py-1 rounded text-xs hover:bg-surface-hover cursor-pointer group/item"
-            @click="openRequest(item, collection.id)"
-          >
-            <BaseBadge :method="item.request.method" />
-            <input
-              v-if="editingId === item.id"
-              v-model="editingName"
-              class="flex-1 bg-surface border border-accent rounded px-1 py-0.5 text-xs text-primary focus:outline-none"
-              @keydown.enter="finishRenameItem(collection.id, item.id)"
-              @keydown.escape="cancelRename"
-              @blur="finishRenameItem(collection.id, item.id)"
-              @click.stop
-            />
-            <span v-else class="text-primary flex-1 truncate">{{ item.name }}</span>
-
-            <!-- Request menu -->
-            <div class="opacity-0 group-hover/item:opacity-100 transition-opacity" @click.stop>
-              <BaseDropdown align="right">
-                <template #trigger>
-                  <button class="p-0.5 text-muted hover:text-primary rounded">
-                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
-                    </svg>
-                  </button>
-                </template>
-                <template #content="{ close }">
-                  <button class="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-primary hover:bg-surface-hover text-left" @click="startRename(item.id, item.name); close()">Rename</button>
-                  <button class="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-primary hover:bg-surface-hover text-left" @click="duplicateItem(collection.id, item); close()">Duplicate</button>
-                  <div class="border-t border-border my-0.5" />
-                  <button class="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-error hover:bg-error/5 text-left" @click="collectionsStore.removeItem(collection.id, item.id); close()">Delete</button>
-                </template>
-              </BaseDropdown>
-            </div>
-          </div>
-        </template>
+        <CollectionTreeItem
+          v-for="item in collection.items"
+          :key="item.id"
+          :item="item"
+          :collection-id="collection.id"
+        />
       </div>
     </div>
   </div>

@@ -29,8 +29,8 @@ export function importPostmanCollection(json: unknown): Collection {
 
 function parseItems(items: PostmanItem[]): CollectionItem[] {
   return items.map((item) => {
-    // Folder: has sub-items array (regardless of whether it also has request)
-    if (item.item && Array.isArray(item.item) && item.item.length > 0) {
+    // Folder: has sub-items array (even if empty — empty folders are valid)
+    if (item.item && Array.isArray(item.item)) {
       return {
         id: crypto.randomUUID(),
         type: 'folder' as const,
