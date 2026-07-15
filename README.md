@@ -1,3 +1,37 @@
+<p align="center">
+  <img src="./assets/logo.png" alt="Snag">
+</p>
+
+<h1 align="center">Snag</h1>
+
+<p align="center">
+A fast, lightweight native API client built with Tauri 2, Vue 3, and TypeScript.
+</p>
+
+<p align="center">
+  Think <strong>Postman</strong>, but native and snappy.
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/github/stars/anggagewor/snag?style=for-the-badge">
+  <img src="https://img.shields.io/github/license/anggagewor/snag?style=for-the-badge">
+  <img src="https://img.shields.io/badge/Tauri-2.x-FFC131?style=for-the-badge&logo=tauri&logoColor=black">
+  <img src="https://img.shields.io/badge/Vue-3.5-42b883?style=for-the-badge&logo=vuedotjs&logoColor=white">
+  <img src="https://img.shields.io/badge/TypeScript-5.x-3178C6?style=for-the-badge&logo=typescript&logoColor=white">
+  <img src="https://img.shields.io/badge/Tailwind-v4-06B6D4?style=for-the-badge&logo=tailwindcss&logoColor=white">
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/Platform-macOS%20%7C%20Linux%20%7C%20Windows-success?style=for-the-badge">
+  <img src="https://img.shields.io/badge/Status-Active%20Development-blue?style=for-the-badge">
+</p>
+
+<p align="center">
+  ⚡ Native • 🚀 Fast • 💾 Local First • 🔥 Zero Electron
+</p>
+---
+
+
 # Snag
 
 A fast, lightweight API client built with Tauri + Vue. Think Postman, but native and snappy.
