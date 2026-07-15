@@ -14,7 +14,6 @@ A fast, lightweight native API client built with Tauri 2, Vue 3, and TypeScript.
 
 <p align="center">
   <img src="https://img.shields.io/github/stars/anggagewor/snag?style=for-the-badge">
-  <img src="https://img.shields.io/github/license/anggagewor/snag?style=for-the-badge">
   <img src="https://img.shields.io/badge/License-MIT-green?style=for-the-badge">
   <img src="https://img.shields.io/badge/Tauri-2.x-FFC131?style=for-the-badge&logo=tauri&logoColor=black">
   <img src="https://img.shields.io/badge/Vue-3.5-42b883?style=for-the-badge&logo=vuedotjs&logoColor=white">
