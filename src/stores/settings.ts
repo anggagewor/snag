@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 
 import { useStorage } from '@/composables/useStorage'
+import { debounce } from '@/utils/debounce'
 import type { ThemeMode } from '@/types/common'
 
 const STORAGE_FILE = 'settings.json'
@@ -49,9 +50,11 @@ export const useSettingsStore = defineStore('settings', () => {
     isLoading.value = false
   }
 
-  async function save() {
+  async function persist() {
     await write(STORAGE_FILE, settings.value)
   }
+
+  const save = debounce(persist, 300)
 
   function updateSettings(updates: Partial<AppSettings>) {
     Object.assign(settings.value, updates)

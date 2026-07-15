@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 
 import { useStorage } from '@/composables/useStorage'
+import { debounce } from '@/utils/debounce'
 import type { Environment } from '@/types/environment'
 import type { UUID } from '@/types/common'
 
@@ -47,12 +48,14 @@ export const useEnvironmentsStore = defineStore('environments', () => {
     isLoading.value = false
   }
 
-  async function save() {
+  async function persist() {
     await write<EnvironmentsState>(STORAGE_FILE, {
       environments: environments.value,
       activeEnvironmentId: activeEnvironmentId.value,
     })
   }
+
+  const save = debounce(persist, 300)
 
   function createEnvironment(name: string): Environment {
     const env: Environment = {

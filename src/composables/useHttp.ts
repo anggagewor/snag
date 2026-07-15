@@ -85,6 +85,15 @@ export function useHttp() {
       return params || undefined
     }
 
+    const needsFileRead = (body.type === 'form-data' && body.formData?.some((f) => f.enabled && f.fieldType === 'file' && f.value))
+      || (body.type === 'binary' && body.binary)
+
+    let readFile: ((path: string) => Promise<Uint8Array>) | null = null
+    if (needsFileRead && isTauri) {
+      const fs = await import('@tauri-apps/plugin-fs')
+      readFile = fs.readFile
+    }
+
     if (body.type === 'form-data') {
       const formData = new FormData()
       const fields = body.formData || []
@@ -92,14 +101,11 @@ export function useHttp() {
       for (const field of fields) {
         if (!field.enabled || !field.key) continue
 
-        if (field.fieldType === 'file' && field.value) {
-          if (isTauri) {
-            const { readFile } = await import('@tauri-apps/plugin-fs')
-            const fileBytes = await readFile(field.value)
-            const fileName = field.fileName || field.value.split('/').pop() || 'file'
-            const blob = new Blob([fileBytes])
-            formData.append(resolve(field.key), blob, fileName)
-          }
+        if (field.fieldType === 'file' && field.value && readFile) {
+          const fileBytes = await readFile(field.value)
+          const fileName = field.fileName || field.value.split('/').pop() || 'file'
+          const blob = new Blob([fileBytes])
+          formData.append(resolve(field.key), blob, fileName)
         } else if (field.fieldType === 'text') {
           formData.append(resolve(field.key), resolve(field.value))
         }
@@ -108,13 +114,9 @@ export function useHttp() {
       return formData
     }
 
-    if (body.type === 'binary' && body.binary) {
-      if (isTauri) {
-        const { readFile } = await import('@tauri-apps/plugin-fs')
-        const fileBytes = await readFile(body.binary)
-        return new Blob([fileBytes])
-      }
-      return undefined
+    if (body.type === 'binary' && body.binary && readFile) {
+      const fileBytes = await readFile(body.binary)
+      return new Blob([fileBytes])
     }
 
     return undefined

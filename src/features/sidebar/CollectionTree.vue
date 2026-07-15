@@ -43,15 +43,7 @@ function finishRenameCollection(collectionId: UUID) {
 
 function finishRenameItem(collectionId: UUID, itemId: UUID) {
   if (editingId.value && editingName.value.trim()) {
-    const collection = collectionsStore.collections.find((c) => c.id === collectionId)
-    if (collection) {
-      const item = collectionsStore.findItem(collection.items, itemId)
-      if (item) {
-        item.name = editingName.value.trim()
-        collection.updatedAt = new Date().toISOString()
-        collectionsStore.save()
-      }
-    }
+    collectionsStore.renameItem(collectionId, itemId, editingName.value.trim())
   }
   editingId.value = null
   editingName.value = ''

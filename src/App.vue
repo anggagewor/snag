@@ -12,7 +12,7 @@ import TabBar from '@/features/tabs/TabBar.vue'
 import TabContent from '@/features/tabs/TabContent.vue'
 
 // Initialize theme
-useTheme()
+const { loadTheme } = useTheme()
 
 // Load persisted data
 const collectionsStore = useCollectionsStore()
@@ -26,6 +26,7 @@ onMounted(async () => {
     environmentsStore.load(),
     historyStore.load(),
     settingsStore.load(),
+    loadTheme(),
   ])
 })
 </script>

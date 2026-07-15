@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 
 import { useStorage } from '@/composables/useStorage'
+import { debounce } from '@/utils/debounce'
 import type { Collection, CollectionItem } from '@/types/collection'
 import type { UUID } from '@/types/common'
 
@@ -13,14 +14,16 @@ export const useCollectionsStore = defineStore('collections', () => {
 
   const { read, write } = useStorage()
 
+  async function persist() {
+    await write(STORAGE_FILE, collections.value)
+  }
+
+  const save = debounce(persist, 300)
+
   async function load() {
     isLoading.value = true
     collections.value = await read<Collection[]>(STORAGE_FILE, [])
     isLoading.value = false
-  }
-
-  async function save() {
-    await write(STORAGE_FILE, collections.value)
   }
 
   function createCollection(name: string): Collection {
@@ -45,6 +48,18 @@ export const useCollectionsStore = defineStore('collections', () => {
     const collection = collections.value.find((c) => c.id === id)
     if (collection) {
       collection.name = name
+      collection.updatedAt = new Date().toISOString()
+      save()
+    }
+  }
+
+  function renameItem(collectionId: UUID, itemId: UUID, name: string) {
+    const collection = collections.value.find((c) => c.id === collectionId)
+    if (!collection) return
+
+    const item = findItem(collection.items, itemId)
+    if (item) {
+      item.name = name
       collection.updatedAt = new Date().toISOString()
       save()
     }
@@ -137,6 +152,7 @@ export const useCollectionsStore = defineStore('collections', () => {
     createCollection,
     deleteCollection,
     renameCollection,
+    renameItem,
     addItem,
     removeItem,
     findItem,

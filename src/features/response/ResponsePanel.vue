@@ -2,6 +2,7 @@
 import { ref, computed } from 'vue'
 
 import type { RequestConfig, ResponseData } from '@/types/request'
+import { formatBytes } from '@/utils/formatters'
 import BaseBadge from '@/components/base/BaseBadge.vue'
 
 const props = defineProps<{
@@ -45,12 +46,6 @@ const formattedBody = computed(() => {
 })
 
 const bodyLines = computed(() => formattedBody.value.split('\n'))
-
-function formatSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
-}
 
 async function copyBody() {
   if (!props.response) return
@@ -113,7 +108,7 @@ async function copyBody() {
             <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4" />
             </svg>
-            {{ formatSize(response.size) }}
+            {{ formatBytes(response.size) }}
           </span>
         </div>
       </div>
@@ -260,7 +255,7 @@ async function copyBody() {
             <div class="border border-border rounded overflow-hidden mt-3">
               <div class="px-3 py-2 bg-surface-alt border-b border-border flex items-center gap-2">
                 <span class="text-[10px] font-medium text-muted uppercase tracking-wider">Response Body</span>
-                <span class="ml-auto text-[10px] text-muted">{{ formatSize(response.size) }} · {{ response.time }}ms</span>
+                <span class="ml-auto text-[10px] text-muted">{{ formatBytes(response.size) }} · {{ response.time }}ms</span>
               </div>
               <div class="p-3">
                 <pre class="text-[11px] font-mono text-primary max-h-[300px] overflow-auto whitespace-pre-wrap break-all">{{ formattedBody }}</pre>

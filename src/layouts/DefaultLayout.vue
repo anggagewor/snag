@@ -1,7 +1,11 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 
-const sidebarWidth = ref(280)
+import { useSettingsStore } from '@/stores/settings'
+
+const settingsStore = useSettingsStore()
+
+const sidebarWidth = computed(() => settingsStore.settings.sidebarWidth)
 const isSidebarCollapsed = ref(false)
 
 function toggleSidebar() {

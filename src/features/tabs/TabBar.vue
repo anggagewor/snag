@@ -71,9 +71,8 @@ function saveToCollection() {
   }
   collectionsStore.addItem(saveTargetCollectionId.value, item, saveTargetFolderId.value || undefined)
 
-  // Link this tab to the new collection item
-  tab.sourceId = `${saveTargetCollectionId.value}:${itemId}`
-  tab.isDirty = false
+  // Link this tab to the new collection item via store action
+  tabsStore.linkTabToSource(tab.id, `${saveTargetCollectionId.value}:${itemId}`)
   showSaveModal.value = false
 }
 </script>

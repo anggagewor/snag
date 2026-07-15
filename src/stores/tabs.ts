@@ -140,6 +140,14 @@ export const useTabsStore = defineStore('tabs', () => {
     }
   }
 
+  function linkTabToSource(id: UUID, sourceId: string) {
+    const tab = tabs.value.find((t) => t.id === id)
+    if (tab) {
+      tab.sourceId = sourceId
+      tab.isDirty = false
+    }
+  }
+
   /**
    * Save current tab back to its source collection item.
    * Also syncs title.
@@ -194,6 +202,7 @@ export const useTabsStore = defineStore('tabs', () => {
     updateTabResponse,
     updateTabTitle,
     markTabClean,
+    linkTabToSource,
     saveTab,
   }
 })

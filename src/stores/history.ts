@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 
 import { useStorage } from '@/composables/useStorage'
+import { debounce } from '@/utils/debounce'
 import type { RequestConfig, ResponseData } from '@/types/request'
 import type { UUID } from '@/types/common'
 
@@ -27,9 +28,11 @@ export const useHistoryStore = defineStore('history', () => {
     isLoading.value = false
   }
 
-  async function save() {
+  async function persist() {
     await write(STORAGE_FILE, entries.value)
   }
+
+  const save = debounce(persist, 300)
 
   function addEntry(request: RequestConfig, response: ResponseData | null) {
     try {

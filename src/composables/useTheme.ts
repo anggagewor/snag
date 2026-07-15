@@ -1,8 +1,10 @@
 import { ref, watch } from 'vue'
 
+import { useStorage } from '@/composables/useStorage'
 import type { ThemeMode } from '@/types/common'
 
 const themeMode = ref<ThemeMode>('system')
+let initialized = false
 
 function getSystemTheme(): 'light' | 'dark' {
   return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
@@ -14,24 +16,31 @@ function applyTheme(mode: ThemeMode) {
 }
 
 export function useTheme() {
-  // Initialize from localStorage
-  const stored = localStorage.getItem('snag-theme') as ThemeMode | null
-  if (stored) {
-    themeMode.value = stored
+  const { read, write } = useStorage()
+
+  if (!initialized) {
+    initialized = true
+
+    // Listen for system theme changes (singleton — only once)
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+      if (themeMode.value === 'system') {
+        applyTheme('system')
+      }
+    })
+
+    watch(themeMode, (mode) => {
+      write('theme.json', { theme: mode })
+      applyTheme(mode)
+    })
   }
+
   applyTheme(themeMode.value)
 
-  // Listen for system theme changes
-  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
-    if (themeMode.value === 'system') {
-      applyTheme('system')
-    }
-  })
-
-  watch(themeMode, (mode) => {
-    localStorage.setItem('snag-theme', mode)
-    applyTheme(mode)
-  })
+  async function loadTheme() {
+    const data = await read<{ theme: ThemeMode }>('theme.json', { theme: 'system' })
+    themeMode.value = data.theme
+    applyTheme(themeMode.value)
+  }
 
   function setTheme(mode: ThemeMode) {
     themeMode.value = mode
@@ -40,5 +49,6 @@ export function useTheme() {
   return {
     themeMode,
     setTheme,
+    loadTheme,
   }
 }
