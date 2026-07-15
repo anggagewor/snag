@@ -2,8 +2,10 @@
 import { ref } from 'vue'
 
 import { useCollectionsStore } from '@/stores/collections'
+import { useEnvironmentsStore } from '@/stores/environments'
 import { importPostmanCollection } from '@/utils/import-postman'
 import { importOpenApiSpec } from '@/utils/import-openapi'
+import { importPostmanEnvironment, isPostmanEnvironment } from '@/utils/import-environment'
 import * as yaml from 'js-yaml'
 import BaseModal from '@/components/base/BaseModal.vue'
 
@@ -16,8 +18,9 @@ const emit = defineEmits<{
 }>()
 
 const collectionsStore = useCollectionsStore()
+const environmentsStore = useEnvironmentsStore()
 
-const importType = ref<'postman' | 'openapi'>('postman')
+const importType = ref<'postman' | 'openapi' | 'environment'>('postman')
 const importText = ref('')
 const importError = ref<string | null>(null)
 const importSuccess = ref<string | null>(null)
@@ -37,7 +40,6 @@ async function pickFile() {
     })
     filePath = result as string | null
   } else {
-    // Browser fallback: file input
     const input = document.createElement('input')
     input.type = 'file'
     input.accept = '.json,.yaml,.yml'
@@ -46,6 +48,7 @@ async function pickFile() {
       if (file) {
         const text = await file.text()
         importText.value = text
+        autoDetectType()
       }
     }
     input.click()
@@ -56,6 +59,7 @@ async function pickFile() {
     const { readTextFile } = await import('@tauri-apps/plugin-fs')
     const content = await readTextFile(filePath)
     importText.value = content
+    autoDetectType()
   }
 }
 
@@ -71,12 +75,10 @@ async function handleImport() {
       return
     }
 
-    // Parse as JSON first, fall back to YAML
     let json: unknown
     try {
       json = JSON.parse(text)
     } catch {
-      // Try YAML
       try {
         json = yaml.load(text)
       } catch (yamlErr) {
@@ -84,19 +86,23 @@ async function handleImport() {
       }
     }
 
-    let collection
-
-    if (importType.value === 'postman') {
-      collection = importPostmanCollection(json)
+    if (importType.value === 'environment') {
+      const env = importPostmanEnvironment(json)
+      environmentsStore.environments.push(env)
+      environmentsStore.save()
+      importSuccess.value = `Imported environment "${env.name}" with ${env.variables.length} variables`
     } else {
-      collection = importOpenApiSpec(json)
+      let collection
+      if (importType.value === 'postman') {
+        collection = importPostmanCollection(json)
+      } else {
+        collection = importOpenApiSpec(json)
+      }
+      collectionsStore.collections.push(collection)
+      collectionsStore.save()
+      importSuccess.value = `Imported "${collection.name}" with ${countRequests(collection.items)} requests`
     }
 
-    // Add to collections store
-    collectionsStore.collections.push(collection)
-    collectionsStore.save()
-
-    importSuccess.value = `Imported "${collection.name}" with ${countRequests(collection.items)} requests`
     importText.value = ''
   } catch (err) {
     importError.value = err instanceof Error ? err.message : 'Failed to parse file'
@@ -132,7 +138,10 @@ function autoDetectType() {
     } catch {
       parsed = yaml.load(text) as Record<string, unknown>
     }
-    if (parsed.openapi || parsed.swagger) {
+
+    if (isPostmanEnvironment(parsed)) {
+      importType.value = 'environment'
+    } else if (parsed.openapi || parsed.swagger) {
       importType.value = 'openapi'
     } else if (
       (parsed.info as Record<string, unknown>)?.schema?.toString().includes('postman') ||
@@ -148,7 +157,7 @@ function autoDetectType() {
 </script>
 
 <template>
-  <BaseModal :open="open" title="Import Collection" max-width="max-w-lg" @close="handleClose">
+  <BaseModal :open="open" title="Import" max-width="max-w-lg" @close="handleClose">
     <div class="space-y-4">
       <!-- Import type -->
       <div class="space-y-1.5">
@@ -172,7 +181,17 @@ function autoDetectType() {
             @click="importType = 'openapi'"
           >
             <span class="font-medium">OpenAPI Spec</span>
-            <p class="text-[10px] mt-0.5 opacity-70">OpenAPI 3.x / Swagger 2.x (JSON or YAML)</p>
+            <p class="text-[10px] mt-0.5 opacity-70">3.x / Swagger 2.x</p>
+          </button>
+          <button
+            class="flex-1 px-3 py-2 text-xs rounded border transition-colors text-left"
+            :class="importType === 'environment'
+              ? 'border-accent bg-accent/5 text-accent'
+              : 'border-border text-primary hover:bg-surface-hover'"
+            @click="importType = 'environment'"
+          >
+            <span class="font-medium">Environment</span>
+            <p class="text-[10px] mt-0.5 opacity-70">Postman env export</p>
           </button>
         </div>
       </div>
@@ -191,7 +210,7 @@ function autoDetectType() {
         <textarea
           v-model="importText"
           class="w-full h-[200px] rounded-md border border-border bg-surface text-primary font-mono text-xs p-3 resize-none focus:outline-none focus:border-accent"
-          placeholder="Paste your Postman Collection or OpenAPI spec JSON here..."
+          placeholder="Paste your Postman Collection, OpenAPI spec, or Postman Environment JSON here..."
           @input="autoDetectType"
         />
       </div>

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, nextTick } from 'vue'
 
-import { Settings, FlaskConical, Check, Save, Plus, Folder } from 'lucide-vue-next'
+import { Settings, Check, Save, Plus, Folder, FlaskConical } from 'lucide-vue-next'
 
 import { useTabsStore } from '@/stores/tabs'
 import { useCollectionsStore } from '@/stores/collections'
@@ -11,6 +11,7 @@ import type { Tab } from '@/stores/tabs'
 import BaseTab from '@/components/base/BaseTab.vue'
 import BaseBadge from '@/components/base/BaseBadge.vue'
 import BaseModal from '@/components/base/BaseModal.vue'
+import EnvironmentSelector from '@/features/environments/EnvironmentSelector.vue'
 
 const tabsStore = useTabsStore()
 const collectionsStore = useCollectionsStore()
@@ -81,7 +82,8 @@ function saveToCollection() {
 
 <template>
   <div class="flex items-center h-[41px] border-b border-border bg-surface-alt">
-    <div class="flex-1 flex overflow-x-auto">
+    <!-- Scrollable tab area -->
+    <div class="flex-1 flex items-center overflow-x-auto">
       <BaseTab
         v-for="tab in tabsStore.tabs"
         :key="tab.id"
@@ -135,8 +137,17 @@ function saveToCollection() {
       </BaseTab>
     </div>
 
+    <!-- New tab button (always visible, outside scroll area) -->
+    <button
+      class="p-1.5 mx-0.5 text-muted hover:text-primary hover:bg-surface-hover rounded transition-colors flex-shrink-0"
+      title="New Request (Cmd+T)"
+      @click="tabsStore.openRequestTab()"
+    >
+      <Plus class="w-4 h-4" />
+    </button>
+
     <!-- Right actions -->
-    <div class="flex items-center gap-0.5 px-1 flex-shrink-0">
+    <div class="flex items-center gap-0.5 px-2 flex-shrink-0 border-l border-border">
       <!-- Save active tab -->
       <button
         v-if="tabsStore.activeTab?.type === 'request'"
@@ -147,14 +158,6 @@ function saveToCollection() {
       >
         <Save class="w-4 h-4" />
       </button>
-      <!-- New tab -->
-      <button
-        class="p-2 text-muted hover:text-primary hover:bg-surface-hover rounded transition-colors"
-        title="New Request (Cmd+T)"
-        @click="tabsStore.openRequestTab()"
-      >
-        <Plus class="w-4 h-4" />
-      </button>
       <!-- Settings -->
       <button
         class="p-2 text-muted hover:text-primary hover:bg-surface-hover rounded transition-colors"
@@ -163,6 +166,10 @@ function saveToCollection() {
       >
         <Settings class="w-4 h-4" />
       </button>
+      <!-- Environment selector -->
+      <div class="ml-1">
+        <EnvironmentSelector />
+      </div>
     </div>
   </div>
 

@@ -15,6 +15,7 @@ const props = defineProps<{
   disabled?: boolean
   placeholder?: string
   searchable?: boolean
+  align?: 'left' | 'right'
 }>()
 
 const emit = defineEmits<{
@@ -65,13 +66,14 @@ onBeforeUnmount(() => document.removeEventListener('mousedown', handleClickOutsi
 </script>
 
 <template>
-  <div ref="containerRef" class="relative inline-block w-full">
+  <div ref="containerRef" class="relative inline-block" :class="props.align === 'right' ? 'w-auto' : 'w-full'">
     <!-- Trigger -->
     <button
       type="button"
       :disabled="disabled"
-      class="w-full flex items-center justify-between rounded-md border border-border bg-surface text-primary transition-colors hover:border-secondary focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent/50 disabled:opacity-50 disabled:cursor-not-allowed"
+      class="flex items-center justify-between rounded-md border border-border bg-surface text-primary transition-colors hover:border-secondary focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent/50 disabled:opacity-50 disabled:cursor-not-allowed"
       :class="[
+        props.align === 'right' ? 'w-auto' : 'w-full',
         size === 'sm' && 'px-2 py-1 text-xs gap-1',
         size === 'lg' && 'px-4 py-2.5 text-base gap-2',
         (!size || size === 'md') && 'px-3 py-1.5 text-sm gap-1.5',
@@ -109,7 +111,8 @@ onBeforeUnmount(() => document.removeEventListener('mousedown', handleClickOutsi
     >
       <div
         v-if="isOpen"
-        class="absolute z-50 mt-1 w-full min-w-[160px] bg-surface border border-border rounded-md shadow-lg overflow-hidden"
+        class="absolute z-50 mt-1 min-w-[160px] bg-surface border border-border rounded-md shadow-lg overflow-hidden"
+        :class="props.align === 'right' ? 'right-0' : 'left-0 w-full'"
       >
         <!-- Search input -->
         <div v-if="searchable" class="p-1.5 border-b border-border">

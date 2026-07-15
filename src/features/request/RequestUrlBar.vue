@@ -9,7 +9,6 @@ import BaseButton from '@/components/base/BaseButton.vue'
 import BaseSelect from '@/components/base/BaseSelect.vue'
 import type { SelectOption } from '@/components/base/BaseSelect.vue'
 import BaseUrlInput from '@/components/base/BaseUrlInput.vue'
-import EnvironmentSelector from '@/features/environments/EnvironmentSelector.vue'
 import { parseCurl } from '@/utils/curl-parser'
 
 const props = defineProps<{
@@ -105,11 +104,6 @@ function onPaste(e: ClipboardEvent) {
       >
         → {{ resolvedUrl }}
       </div>
-    </div>
-
-    <!-- Environment selector -->
-    <div class="w-[130px] flex-shrink-0">
-      <EnvironmentSelector />
     </div>
 
     <!-- Send button -->

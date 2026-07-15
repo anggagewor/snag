@@ -30,6 +30,7 @@ function onSelect(value: string) {
     size="md"
     placeholder="Environment"
     searchable
+    align="right"
     @update:model-value="onSelect"
   />
 </template>
