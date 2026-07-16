@@ -1,234 +1,153 @@
 # Snag — Features & Roadmap
 
-## Implemented Features ✅
+## Implemented ✅
 
-### Core Request Builder
-- [x] HTTP method selector (GET, POST, PUT, PATCH, DELETE, HEAD, OPTIONS)
-- [x] Protocol selector (REST / WebSocket / GraphQL / gRPC) — REST fully functional, others coming soon
-- [x] URL input with environment variable highlighting
-- [x] Query parameters editor (key-value, enable/disable per row)
-- [x] Request headers editor (key-value, enable/disable per row)
-- [x] cURL paste detection — paste cURL command langsung ke URL bar, auto-parse jadi request
-- [x] Variable resolution preview (tampil resolved URL di bawah input)
-- [x] Send request via `Cmd+Enter`
-- [x] Sidebar toggle button (burger menu) di tab bar
+### Request Builder
+- HTTP method selector (GET, POST, PUT, PATCH, DELETE, HEAD, OPTIONS)
+- Protocol selector (REST / WebSocket / GraphQL / gRPC) — REST fully functional
+- URL input with environment variable highlighting
+- Query parameters editor (key-value, enable/disable)
+- Request headers editor (key-value, enable/disable, autocomplete)
+- cURL paste detection in URL bar
+- Variable resolution preview
 
 ### Request Body
-- [x] JSON body editor (CodeMirror with syntax highlighting)
-- [x] Raw body editor (text, JavaScript, HTML, XML)
-- [x] Form Data (multipart) — text fields + file upload via native file picker
-- [x] URL-encoded form body
-- [x] Binary file upload
-- [x] JSON format/prettify button
+- JSON editor (CodeMirror with syntax highlighting + prettify)
+- Raw body (text, JavaScript, HTML, XML)
+- Form Data (multipart) — text + file upload via native picker
+- URL-encoded form
+- Binary file upload
 
 ### Authentication
-- [x] No Auth
-- [x] Bearer Token (with env variable support)
-- [x] Basic Auth (username + password, with env variable support)
-- [x] API Key (header or query param, with env variable support)
+- No Auth / Bearer Token / Basic Auth / API Key
+- Environment variable support in all auth fields
 
-### Pre-request Scripts & Tests
-- [x] Pre-request script editor (JavaScript, runs before request)
-- [x] Test script editor (JavaScript, runs after response)
-- [x] `snag.variables.get/set()` — read/write environment variables at runtime
-- [x] `snag.test(name, fn)` — define test assertions
-- [x] `snag.expect(value)` — assertion library (toBe, toEqual, toContain, toBeTruthy, toBeFalsy, toBeGreaterThan, toBeLessThan, toHaveProperty)
-- [x] `snag.request` — access current request info (url, method, headers)
-- [x] `snag.response` — access response data (status, statusText, headers, body, time, size)
-- [x] `console.log/warn/error` — logging yang tampil di console output
-- [x] Test results display (pass/fail per test, error messages)
-- [x] Snippets dropdown — klik insert code snippets ke editor (pre-request & test)
-- [x] Pass/fail indicator badge di section tab
+### Scripts
+- Pre-request script editor (JavaScript, runs before request)
+- Test script editor (JavaScript, runs after response)
+- `snag.*` API: variables, request/response context, assertions
+- Snippets dropdown for common patterns
+- Console output (log/warn/error)
+- Pass/fail indicator badges
 
 ### Response Viewer
-- [x] Status code + status text display (color-coded badge)
-- [x] Response time (ms) + response size display
-- [x] Response body viewer with syntax highlighting (JSON, HTML, XML, JavaScript)
-- [x] Pretty / Raw toggle
-- [x] Copy response body to clipboard
-- [x] Response headers table
-- [x] Console tab — full request/response detail (sent headers, resolved URL, response headers, body)
-- [x] Loading state (spinner)
-- [x] Error state (network errors, timeouts)
+- Status code badge (color-coded) + time + size
+- Body with syntax highlighting (JSON, HTML, XML, JS)
+- Pretty / Raw toggle + copy to clipboard
+- Response headers table
+- Console tab (full request/response inspector)
+- Loading & error states
 
 ### Collections
-- [x] Create, rename, delete collections
-- [x] Nested folder structure (recursive tree)
-- [x] Add request / folder to collection
-- [x] Rename items in tree
-- [x] Duplicate collection
-- [x] Context menu per item (rename, duplicate, delete, add folder, add request)
-- [x] Drag & drop reorder items dalam collection tree
-- [x] Collection variables (scoped per collection, editable via context menu)
-- [x] Copy request as cURL (context menu)
+- Create, rename, delete, duplicate collections
+- Nested folder structure (recursive tree)
+- Context menu (rename, duplicate, delete, add folder/request)
+- Drag & drop reorder
+- Collection-level variables
+- Copy as cURL (per-request)
 
 ### Tabs
-- [x] Multi-tab interface (bisa buka banyak request sekaligus)
-- [x] Tab dirty state indicator
-- [x] Close tab (`Cmd+W`)
-- [x] New tab (`Cmd+T`)
-- [x] Save request back to collection (`Cmd+S`)
-- [x] Deduplicate — buka item yang sama nggak bikin tab baru
-- [x] Settings tab (singleton)
-- [x] Environments tab (singleton)
-- [x] Unsaved changes warning — confirm dialog saat close dirty tab (Discard / Save & Close / Cancel)
-- [x] Protocol badge di tab (WS / GQL / gRPC) untuk non-REST tabs
+- Multi-tab interface with dirty state indicator
+- Close (Cmd+W), New (Cmd+T), Save (Cmd+S)
+- Unsaved changes warning (Discard / Save & Close / Cancel)
+- Deduplicate (same request won't open twice)
+- Protocol badge for non-REST tabs
 
 ### Environments
-- [x] Multiple environments
-- [x] Variable editor (key-value, enable/disable per row)
-- [x] Set active environment
-- [x] `{{variable}}` substitution across URL, headers, body, auth
-- [x] Variable resolved at send-time
-- [x] Collection-level variables (resolved before environment variables)
-- [x] Export environment (Postman format)
-- [x] Import environment (Postman format)
-- [x] Quick switch from sidebar
+- Multiple environments with variable editor
+- Set active environment, quick switch from sidebar
+- `{{variable}}` substitution (URL, headers, params, body, auth)
+- Collection variables (resolved before environment)
+- Import/export Postman environment format
 
 ### History
-- [x] Auto-save setiap request yang dikirim
-- [x] Grouped by date (Today, Yesterday, Older)
-- [x] Click to re-open di tab baru (with response)
-- [x] Delete individual entry
-- [x] Clear all history
-- [x] Max history items (configurable)
+- Auto-save after each request, grouped by date
+- Click to restore, delete individual entries, clear all
+- Configurable max history items
 
 ### Import / Export
-- [x] Import Postman Collection v2.1
-- [x] Import OpenAPI 3.x / Swagger 2.x (auto-generate requests per endpoint)
-- [x] Import Postman Environment
-- [x] Export collection as Postman Collection v2.1
-- [x] Export environment as Postman Environment
-- [x] Export request as cURL (per-request context menu)
-- [x] Auto-detect format saat import (Postman vs OpenAPI vs Environment)
-- [x] File picker (native Tauri dialog) + paste text manual
-- [x] YAML support untuk OpenAPI spec
+- Import: Postman Collection v2.1, OpenAPI 3.x / Swagger 2.x (JSON/YAML), Postman Environment
+- Export: Postman Collection, Postman Environment, cURL
+- Auto-detect format, native file picker + paste
 
 ### Search
-- [x] Command palette (`Cmd+K`) — search all requests across collections
-- [x] Search by name, URL, method, collection name
-- [x] Keyboard navigation (Arrow Up/Down, Enter to open, Escape to close)
+- Command palette (Cmd+K) — search by name, URL, method, collection
+- Keyboard navigation (arrows, Enter, Escape)
 
 ### Settings
-- [x] Theme: Light / Dark / System
-- [x] Default HTTP method
-- [x] Request timeout (configurable)
-- [x] Follow redirects toggle
-- [x] Verify SSL toggle (disable for self-signed certs)
-- [x] Default headers (auto-included, editable, per-header enable/disable)
-- [x] Max history items setting
+- Theme: Light / Dark / System
+- Default HTTP method, timeout, follow redirects, verify SSL
+- Default headers (editable, per-header enable/disable)
+- Max history items
 
 ### UI/UX
-- [x] Dark mode (class-based, Tailwind)
-- [x] Sidebar collapsible (`Cmd+B` + burger menu button)
-- [x] Resizable split pane (request/response)
-- [x] HTTP method color coding
-- [x] Protocol selector with color coding (REST green, WS amber, GQL pink, gRPC blue)
-- [x] "Coming Soon" badge + disabled state untuk protocols yang belum ready
-- [x] CodeMirror editor integration (JSON, HTML, XML, JS)
-- [x] Custom base components (Button, Input, Select, Dropdown, Modal, Badge, Tab, Tooltip, etc.)
-- [x] Env variable highlighting in inputs (`{{var}}` terlihat beda)
+- Dark mode (class-based Tailwind)
+- Sidebar collapsible (Cmd+B)
+- Resizable split pane (request/response)
+- HTTP method & protocol color coding
+- CodeMirror integration
+- Custom base components (Button, Input, Select, Dropdown, Modal, etc.)
 
-### Storage & Persistence
-- [x] JSON file-based storage via Tauri filesystem API
-- [x] Auto-save with debounce (300ms)
-- [x] Browser localStorage fallback (dev mode)
+### Storage
+- Workspace-based: one file per request, Git-friendly
+- JSON files via Tauri FS plugin
+- Browser localStorage fallback (dev mode)
 
-### Multi-Protocol Architecture (Foundation)
-- [x] `ProtocolType` enum: `rest`, `websocket`, `graphql`, `grpc`
-- [x] Type definitions per protocol (config + response/session types)
-- [x] `CollectionItem` supports semua protocol types
-- [x] `Tab` supports protocol-specific state (config, response, session)
-- [x] Protocol selector di URL bar (functional, switches tab protocol)
-- [x] Backward-compatible — omitted `protocol` defaults to REST
-- [x] Factory functions: `createEmptyRequest()`, `createEmptyWebSocketConfig()`, `createEmptyGraphQLConfig()`, `createEmptyGrpcConfig()`
+### Multi-Protocol Foundation
+- Type definitions for REST, WebSocket, GraphQL, gRPC
+- Protocol selector functional in UI
+- Backward-compatible (default REST)
 
 ---
 
-## Planned / Nice-to-Have 🚀
-
-### High Priority (v1.x) — ✅ ALL DONE
-
-All 8 high-priority features have been implemented.
+## Planned 🚀
 
 ### Medium Priority (v1.x ~ v2)
 
-| Feature | Deskripsi |
-|---------|-----------|
-| **Cookie jar** | Auto-capture cookies dari response, kirim di request berikutnya. Cookie viewer/editor |
-| **Request chaining** | Pakai value dari response A sebagai input request B (extract dari JSON path) |
-| **OAuth 2.0 flow** | Full OAuth2 flow UI — Authorization Code, Client Credentials, PKCE. Token auto-refresh |
-| **Response body search** | Find text di response body (Cmd+F) |
-| **Code generation** | Generate code snippet dari request (JavaScript fetch, Python requests, Go, Rust, etc.) |
-| **Proxy settings** | HTTP/SOCKS proxy configuration |
-| **Certificate management** | Client certificate (mTLS) support untuk enterprise APIs |
-| **Multiple workspaces** | Pisahkan collections per project/workspace |
-| **Variable scopes** | Hierarchy: Global → Environment → Collection → Request |
-| **Bulk edit mode** | Edit headers/params/body sebagai raw text (kayak Postman bulk edit) |
+| Feature | Description |
+|---------|-------------|
+| Cookie jar | Auto-capture & send cookies, cookie viewer/editor |
+| Request chaining | Use response values as input for next request |
+| OAuth 2.0 flow | Authorization Code, Client Credentials, PKCE, auto-refresh |
+| Response body search | Cmd+F in response body |
+| Code generation | Generate snippets (JS, Python, Go, Rust, etc.) |
+| Proxy settings | HTTP/SOCKS proxy configuration |
+| Certificate management | Client certificate (mTLS) |
+| Variable scopes | Global → Environment → Collection → Request hierarchy |
+| Bulk edit mode | Raw text editing for headers/params |
 
 ### Protocol Implementations (v2+)
 
-| Feature | Status | Deskripsi |
-|---------|--------|-----------|
-| **WebSocket client** | Types ready, UI coming soon | Connect, send messages, view frames real-time |
-| **GraphQL support** | Types ready, UI coming soon | Schema introspection, query editor with autocomplete, variables panel |
-| **gRPC client** | Types ready, UI coming soon | Load .proto files, invoke unary + streaming RPCs |
-| **SSE (Server-Sent Events)** | Backlog | Stream viewer buat EventSource connections |
+| Protocol | Status | Description |
+|----------|--------|-------------|
+| WebSocket | Types ready | Connect, send messages, view frames real-time |
+| GraphQL | Types ready | Schema introspection, query editor, variables panel |
+| gRPC | Types ready | Load .proto files, invoke unary + streaming RPCs |
+| SSE | Backlog | EventSource stream viewer |
 
-### Low Priority / Nice-to-Have (v2+)
+### Nice-to-Have (v2+)
 
-| Feature | Deskripsi |
-|---------|-----------|
-| **API documentation viewer** | Render OpenAPI spec sebagai readable docs |
-| **Request diff** | Compare dua response side-by-side |
-| **Performance benchmarking** | Kirim request N kali, tampilkan min/max/avg/p95 |
-| **Response visualization** | Chart/graph buat numeric response data |
-| **Custom themes** | User-defined color scheme beyond light/dark |
-| **Plugin system** | Extension API buat custom auth methods, importers, body types |
-| **Import: Insomnia** | Import Insomnia collection format |
-| **Import: HAR** | Import browser HAR files jadi collection |
-| **Export: OpenAPI** | Generate OpenAPI spec dari collection |
-| **Folder-level auth** | Inherit auth config dari folder/collection ke child requests |
-| **Request examples** | Multiple saved examples per request (different body/params) |
-| **Markdown notes** | Attach notes/docs ke request atau collection |
-| **Keyboard shortcuts customization** | User-defined keybindings |
-| **CLI companion** | Run Snag collections dari terminal (headless, CI/CD) |
-| **Snippet library** | Reusable request body / header templates |
-
-### Exploratory / Future Vision
-
-| Feature | Deskripsi |
-|---------|-----------|
-| **Team sync** | Cloud-based collection sharing (kalau eventually mau SaaS) |
-| **Git integration** | Simpan collections sebagai versioned files, sync dengan Git repo |
-| **AI assistant** | Generate requests dari natural language, auto-suggest test assertions |
-| **Mock server** | Jalankan local mock server dari OpenAPI spec / collection |
-| **Load testing** | Simple load test UI (concurrent requests, ramp-up) |
-| **API monitoring** | Scheduled requests + alerting kalau response berubah/gagal |
+| Feature | Description |
+|---------|-------------|
+| API documentation viewer | Render OpenAPI spec as readable docs |
+| Request diff | Compare responses side-by-side |
+| Performance benchmarking | N requests, min/max/avg/p95 |
+| Custom themes | User-defined color schemes |
+| Plugin system | Extension API for auth, importers, body types |
+| Import: Insomnia/HAR | Additional import formats |
+| Export: OpenAPI | Generate spec from collection |
+| Folder-level auth | Inherit auth from folder/collection |
+| Request examples | Multiple saved examples per request |
+| CLI companion | Run collections headless (CI/CD) |
+| Mock server | Local mock from OpenAPI spec |
+| Load testing | Concurrent requests UI |
 
 ---
 
-## Architecture Debt / Improvements 🔧
+## Architecture Debt 🔧
 
-| Item | Status | Notes |
-|------|--------|-------|
-| Tab state persistence | ✅ Done | Tabs auto-saved ke `tabs.json`, restored on restart (response data excluded — terlalu besar & stale) |
-| Request timeout enforcement | ✅ Done | AbortController + configurable timeout dari settings. Cancel button di response panel |
-| Error boundary | ✅ Done | Global error handler catch unhandled rejections & errors, toast stack di bottom-right, auto-dismiss 8s, copy error |
-| Accessibility | ✅ Done | ARIA tree roles, keyboard nav (Arrow Up/Down, Enter/Space, Left/Right untuk expand/collapse), focus trap di modals, Escape to close |
-| Multi-protocol type system | ✅ Done | Foundation types for REST, WebSocket, GraphQL, gRPC — backward compatible |
-| Undo/redo | ❌ Backlog | Undo perubahan di request builder (butuh history stack per-tab) |
-| Performance (large collections) | ❌ Backlog | Virtual scrolling — premature sekarang, revisit kalau >500 items di tree |
-| File watcher | ❌ Backlog | Detect external changes ke JSON storage files (useful kalau multi-window) |
-
----
-
-## Status Summary
-
-| Category | Count |
-|----------|-------|
-| Implemented features | ~65+ |
-| High priority backlog | 0 (all done) |
-| Medium priority backlog | 10 |
-| Protocol implementations | 3 (types ready, UI pending) |
-| Nice-to-have / future | 20+ |
+| Item | Status |
+|------|--------|
+| Undo/redo | Backlog — needs history stack per-tab |
+| Virtual scrolling (large collections) | Backlog — revisit at >500 items |
+| File watcher (external changes) | Backlog — useful for multi-window |

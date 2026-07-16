@@ -5,92 +5,51 @@
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │                          UI Layer                                │
-│                                                                  │
-│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────────┐   │
-│  │ Sidebar  │  │  TabBar  │  │ Request  │  │   Response   │   │
-│  │  Panel   │  │          │  │  Panel   │  │    Panel     │   │
-│  └──────────┘  └──────────┘  └──────────┘  └──────────────┘   │
-│                                                                  │
+│  Vue components (features/, components/base/, layouts/)          │
 └──────────────────────────────┬──────────────────────────────────┘
-                               │
+                               │ reactive bindings
 ┌──────────────────────────────▼──────────────────────────────────┐
 │                        State Layer                               │
-│                                                                  │
-│  ┌───────────┐  ┌──────────┐  ┌─────────┐  ┌──────────────┐   │
-│  │ workspace │  │collections│  │  tabs   │  │ environments │   │
-│  │   Store   │  │  Store   │  │  Store  │  │    Store     │   │
-│  └───────────┘  └──────────┘  └─────────┘  └──────────────┘   │
-│                                                                  │
-│  ┌───────────┐  ┌──────────┐                                    │
-│  │  history  │  │ settings │                                    │
-│  │   Store   │  │  Store   │                                    │
-│  └───────────┘  └──────────┘                                    │
-│                                                                  │
+│  Pinia stores (workspace, tabs, history, settings)               │
 └──────────────────────────────┬──────────────────────────────────┘
-                               │
+                               │ calls service methods
 ┌──────────────────────────────▼──────────────────────────────────┐
 │                       Service Layer                              │
-│                                                                  │
-│  ┌────────────────┐  ┌─────────────┐  ┌────────────────────┐   │
-│  │ WorkspaceService│  │HistoryService│  │  SettingsService  │   │
-│  └───────┬────────┘  └──────┬──────┘  └─────────┬──────────┘   │
-│          │                   │                    │               │
-│  ┌───────▼────────┐  ┌──────▼──────┐  ┌─────────▼──────────┐   │
-│  │RegistryService │  │             │  │                     │   │
-│  └────────────────┘  │             │  │                     │   │
-│                      │             │  │                     │   │
-└──────────────────────┼─────────────┼──┼─────────────────────┘───┘
-                       │             │  │
-┌──────────────────────▼─────────────▼──▼─────────────────────────┐
-│                      Storage Layer                               │
-│                                                                  │
-│  ┌──────────────────────────────────────────────────────────┐   │
-│  │                    StorageAdapter                          │   │
-│  │                                                           │   │
-│  │  ┌──────────────┐  ┌─────────────┐  ┌────────────────┐  │   │
-│  │  │ JsonFsAdapter│  │ SQLiteAdapter│  │  GitAdapter    │  │   │
-│  │  │   (v1)       │  │   (future)  │  │   (future)    │  │   │
-│  │  └──────────────┘  └─────────────┘  └────────────────┘  │   │
-│  └──────────────────────────────────────────────────────────┘   │
-│                                                                  │
+│  WorkspaceService, RegistryService, HistoryService, Settings     │
 └──────────────────────────────┬──────────────────────────────────┘
-                               │
+                               │ delegates to adapter
+┌──────────────────────────────▼──────────────────────────────────┐
+│                      Storage Layer                               │
+│  StorageAdapter (JSON FS today, SQLite/Git future)               │
+└──────────────────────────────┬──────────────────────────────────┘
+                               │ Tauri plugin calls
 ┌──────────────────────────────▼──────────────────────────────────┐
 │                    Platform Layer                                 │
-│                                                                  │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────────────┐  │
-│  │ Tauri FS     │  │ Tauri HTTP   │  │ Tauri Window/Shell   │  │
-│  │ Plugin       │  │ Plugin       │  │ Plugins              │  │
-│  └──────────────┘  └──────────────┘  └──────────────────────┘  │
-│                                                                  │
+│  Tauri FS, HTTP, Dialog plugins (Rust native I/O)                │
 └─────────────────────────────────────────────────────────────────┘
 ```
+
+**Rules:**
+1. UI → Store only (never call services directly)
+2. Store → Service only (never call storage directly)
+3. Service → StorageAdapter only (never call Tauri directly)
+4. Domain is imported by all layers but imports nothing
 
 ## Data Ownership
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                    Global (~/.snag/)                          │
-│                                                              │
-│  workspaces.json ──── RegistryService                        │
-│  settings.json   ──── SettingsService (global layer)         │
-│  history/        ──── HistoryService                         │
-│  scratch/        ──── WorkspaceService (always available)    │
-│                                                              │
-└─────────────────────────────────────────────────────────────┘
+~/.snag/ (Global)
+├── workspaces.json ─── RegistryService
+├── settings.json   ─── SettingsService (global layer)
+├── history/        ─── HistoryService
+└── scratch/        ─── WorkspaceService (always available)
 
-┌─────────────────────────────────────────────────────────────┐
-│              Workspace (<user-path>/)                         │
-│                                                              │
-│  workspace.json  ──── WorkspaceService                       │
-│  collections/    ──── WorkspaceService.collections           │
-│  requests/       ──── WorkspaceService.requests              │
-│  environments/   ──── WorkspaceService.environments          │
-│  settings.json   ──── SettingsService (workspace layer)      │
-│  scripts/        ──── WorkspaceService (future)              │
-│  certificates/   ──── WorkspaceService (future)              │
-│                                                              │
-└─────────────────────────────────────────────────────────────┘
+<user-path>/ (Workspace)
+├── workspace.json  ─── WorkspaceService
+├── collections/    ─── WorkspaceService
+├── requests/       ─── WorkspaceService
+├── environments/   ─── WorkspaceService
+└── settings.json   ─── SettingsService (workspace layer)
 ```
 
 ## Startup Flow
@@ -99,179 +58,72 @@
 App Launch
     │
     ▼
-┌────────────────────────────┐
-│  Initialize Global Services │
-│  - SettingsService (global) │
-│  - RegistryService          │
-│  - HistoryService           │
-└─────────────┬──────────────┘
-              │
-              ▼
-┌────────────────────────────┐
-│  Load Workspace Registry    │
-│  - Validate paths           │
-│  - Mark missing workspaces  │
-└─────────────┬──────────────┘
-              │
-              ▼
-┌────────────────────────────┐
-│  Determine startup action   │
-│                             │
-│  Has lastOpened workspace?  │
-│  ├── Yes → Open it         │
-│  └── No  → Show welcome    │
-│                             │
-│  Always: ensure scratch pad │
-└─────────────┬──────────────┘
-              │
-              ▼
-┌────────────────────────────┐
-│  Open Workspace             │
-│  1. Read workspace.json     │
-│  2. Validate version        │
-│  3. Migrate if needed       │
-│  4. Load collection trees   │
-│  5. Load environments meta  │
-│  6. Hydrate Pinia stores    │
-│  7. Restore tabs (runtime)  │
-│  8. Detect orphans (async)  │
-└─────────────┬──────────────┘
-              │
-              ▼
-┌────────────────────────────┐
-│  Ready                      │
-│  - Tree rendered            │
-│  - Tabs restored            │
-│  - Requests lazy-loaded     │
-└────────────────────────────┘
+Initialize Services (provider.ts)
+    │
+    ▼
+Detect & Run Migration (v0 → v1 if needed)
+    │
+    ▼
+Ensure Scratch Pad exists
+    │
+    ▼
+Determine workspace to open:
+  migration result → last opened → scratch pad
+    │
+    ▼
+Open Workspace:
+  1. Read workspace.json (manifest)
+  2. Load collection trees
+  3. Load environments
+  4. Hydrate Pinia stores
+  5. Check health (async, non-blocking)
+    │
+    ▼
+Ready — UI renders
 ```
 
 ## Request Lifecycle
 
 ```
-                    ┌─────────────────┐
-                    │  User clicks     │
-                    │  request in tree │
-                    └────────┬────────┘
-                             │
-                             ▼
-                    ┌─────────────────┐
-                    │  tabsStore       │
-                    │  .openTab(id)    │
-                    └────────┬────────┘
-                             │
-                             ▼
-                    ┌─────────────────────────┐
-                    │  workspaceService       │
-                    │  .getRequest(id)        │
-                    │                          │
-                    │  Already cached?         │
-                    │  ├── Yes → return        │
-                    │  └── No  → load from    │
-                    │           disk (lazy)    │
-                    └────────┬────────────────┘
-                             │
-                             ▼
-                    ┌─────────────────┐
-                    │  Store hydrated  │
-                    │  UI renders      │
-                    │  request builder │
-                    └────────┬────────┘
-                             │
-                             │ user sends request
-                             ▼
-              ┌──────────────────────────────┐
-              │  Execution Pipeline            │
-              │                                │
-              │  1. Pre-request script         │
-              │     └── useScriptRunner        │
-              │                                │
-              │  2. Variable resolution        │
-              │     └── collection vars        │
-              │     └── environment vars       │
-              │                                │
-              │  3. HTTP execution             │
-              │     └── useHttp                │
-              │     └── Tauri HTTP plugin      │
-              │                                │
-              │  4. Post-response tests        │
-              │     └── useScriptRunner        │
-              │                                │
-              │  5. Record history             │
-              │     └── historyService         │
-              │                                │
-              └──────────────────────────────┘
+User clicks Send (or Cmd+Enter)
+    │
+    ▼
+1. Pre-request script (useScriptRunner)
+   └── snag.variables.set() can inject vars
+    │
+    ▼
+2. Variable resolution
+   └── Collection vars → Environment vars → {{key}} replaced
+    │
+    ▼
+3. HTTP execution (useHttp → Tauri HTTP plugin)
+   └── Bypasses CORS, supports all methods + custom headers
+    │
+    ▼
+4. Post-response test scripts (useScriptRunner)
+   └── snag.test(), snag.expect() assertions
+    │
+    ▼
+5. Record to history (HistoryService, global)
+    │
+    ▼
+6. Display response in viewer
 ```
 
 ## Workspace Switch Flow
 
 ```
 User selects different workspace
-         │
-         ▼
-┌─────────────────────────┐
-│  Save current state      │
-│  - Dirty requests        │
-│  - Tab positions         │
-│  - Runtime state         │
-└────────┬────────────────┘
-         │
-         ▼
-┌─────────────────────────┐
-│  Close current workspace │
-│  - Clear stores          │
-│  - Unload requests       │
-└────────┬────────────────┘
-         │
-         ▼
-┌─────────────────────────┐
-│  Open new workspace      │
-│  (same as startup flow)  │
-└─────────────────────────┘
-```
-
-## Import Flow (Workspace-Aware)
-
-```
-User triggers import
-         │
-         ▼
-┌─────────────────────────┐
-│  Select source           │
-│  - File (Postman, cURL)  │
-│  - OpenAPI spec          │
-│  - URL                   │
-└────────┬────────────────┘
-         │
-         ▼
-┌─────────────────────────┐
-│  Parse & Preview         │
-│  - Show what will be     │
-│    imported              │
-│  - Count requests        │
-│  - Show folder structure │
-└────────┬────────────────┘
-         │
-         ▼
-┌─────────────────────────┐
-│  Choose target           │
-│  - Existing workspace    │
-│  - New workspace         │
-│  - Existing collection   │
-│  - New collection        │
-└────────┬────────────────┘
-         │
-         ▼
-┌─────────────────────────┐
-│  Write files             │
-│  - workspace.json        │
-│  - collection tree       │
-│  - individual requests   │
-│  - environments (if any) │
-└────────┬────────────────┘
-         │
-         ▼
-┌─────────────────────────┐
-│  Open workspace / reload │
-└─────────────────────────┘
+    │
+    ▼
+Close current workspace (clear stores)
+    │
+    ▼
+Clear all tabs
+    │
+    ▼
+Open new workspace (same as startup open flow)
+    │
+    ▼
+Reload workspace settings
 ```
