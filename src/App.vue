@@ -7,10 +7,12 @@ import { useCollectionsStore } from '@/stores/collections'
 import { useEnvironmentsStore } from '@/stores/environments'
 import { useHistoryStore } from '@/stores/history'
 import { useSettingsStore } from '@/stores/settings'
+import { useTabsStore } from '@/stores/tabs'
 import DefaultLayout from '@/layouts/DefaultLayout.vue'
 import SidebarPanel from '@/features/sidebar/SidebarPanel.vue'
 import TabBar from '@/features/tabs/TabBar.vue'
 import TabContent from '@/features/tabs/TabContent.vue'
+import BaseErrorBoundary from '@/components/base/BaseErrorBoundary.vue'
 
 // Initialize theme
 const { loadTheme } = useTheme()
@@ -40,6 +42,7 @@ const collectionsStore = useCollectionsStore()
 const environmentsStore = useEnvironmentsStore()
 const historyStore = useHistoryStore()
 const settingsStore = useSettingsStore()
+const tabsStore = useTabsStore()
 
 onMounted(async () => {
   await Promise.all([
@@ -47,19 +50,22 @@ onMounted(async () => {
     environmentsStore.load(),
     historyStore.load(),
     settingsStore.load(),
+    tabsStore.load(),
     loadTheme(),
   ])
 })
 </script>
 
 <template>
-  <DefaultLayout ref="layoutRef">
-    <template #sidebar>
-      <SidebarPanel />
-    </template>
-    <template #content>
-      <TabBar />
-      <TabContent />
-    </template>
-  </DefaultLayout>
+  <BaseErrorBoundary>
+    <DefaultLayout ref="layoutRef">
+      <template #sidebar>
+        <SidebarPanel />
+      </template>
+      <template #content>
+        <TabBar />
+        <TabContent />
+      </template>
+    </DefaultLayout>
+  </BaseErrorBoundary>
 </template>

@@ -16,6 +16,10 @@ const props = defineProps<{
   error?: string | null
 }>()
 
+const emit = defineEmits<{
+  cancel: []
+}>()
+
 const activeTab = ref<'body' | 'headers' | 'console'>('body')
 const bodyView = ref<'pretty' | 'raw'>('pretty')
 const copied = ref(false)
@@ -74,6 +78,12 @@ async function copyBody() {
       <div class="text-center">
         <Loader2 class="w-8 h-8 mx-auto animate-spin text-accent mb-2" />
         <p class="text-sm text-muted">Sending request...</p>
+        <button
+          class="mt-2 px-3 py-1.5 text-xs rounded-md border border-border text-secondary hover:text-error hover:border-error transition-colors"
+          @click="emit('cancel')"
+        >
+          Cancel
+        </button>
       </div>
     </div>
 

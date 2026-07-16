@@ -19,6 +19,8 @@ export function useHttp() {
   const isLoading = ref(false)
   const error = ref<string | null>(null)
 
+  let abortController: AbortController | null = null
+
   function resolve(str: string): string {
     const envStore = useEnvironmentsStore()
     return envStore.resolveVariablesInString(str)
@@ -123,8 +125,19 @@ export function useHttp() {
   }
 
   async function sendRequest(request: RequestConfig): Promise<ResponseData | null> {
+    // Abort any in-flight request
+    if (abortController) {
+      abortController.abort()
+    }
+    abortController = new AbortController()
+    const { signal } = abortController
+
     isLoading.value = true
     error.value = null
+
+    const settingsStore = useSettingsStore()
+    const timeoutMs = settingsStore.settings.timeout * 1000
+    const timeoutId = setTimeout(() => abortController?.abort(), timeoutMs)
 
     const startTime = performance.now()
 
@@ -140,7 +153,6 @@ export function useHttp() {
 
       const headers = buildHeaders(request)
       const body = await buildBody(request)
-      const settingsStore = useSettingsStore()
 
       // Set content-type for JSON
       if (request.body.type === 'json' && !headers['Content-Type']) {
@@ -154,6 +166,7 @@ export function useHttp() {
         method: request.method,
         headers,
         body: body as BodyInit | undefined,
+        signal,
         dangerAcceptInvalidCerts: !settingsStore.settings.verifySSL,
       })
 
@@ -177,11 +190,26 @@ export function useHttp() {
         requestMethod: request.method,
       }
     } catch (err) {
-      error.value = err instanceof Error ? err.message : 'Request failed'
+      if (err instanceof DOMException && err.name === 'AbortError') {
+        error.value = `Request timed out after ${settingsStore.settings.timeout}s`
+      } else {
+        error.value = err instanceof Error ? err.message : 'Request failed'
+      }
       console.error('[useHttp] Request error:', err)
       return null
     } finally {
+      clearTimeout(timeoutId)
+      abortController = null
       isLoading.value = false
+    }
+  }
+
+  function cancelRequest() {
+    if (abortController) {
+      abortController.abort()
+      abortController = null
+      isLoading.value = false
+      error.value = 'Request cancelled'
     }
   }
 
@@ -189,5 +217,6 @@ export function useHttp() {
     isLoading,
     error,
     sendRequest,
+    cancelRequest,
   }
 }

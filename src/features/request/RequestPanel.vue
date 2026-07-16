@@ -20,7 +20,7 @@ const props = defineProps<{
 
 const tabsStore = useTabsStore()
 const historyStore = useHistoryStore()
-const { isLoading, error, sendRequest } = useHttp()
+const { isLoading, error, sendRequest, cancelRequest } = useHttp()
 
 const activeSection = ref<'params' | 'headers' | 'body' | 'auth'>('params')
 
@@ -86,7 +86,7 @@ async function handleSend() {
       </template>
 
       <template #bottom>
-        <ResponsePanel :response="tab.response" :request="tab.request" :is-loading="isLoading" :error="error" />
+        <ResponsePanel :response="tab.response" :request="tab.request" :is-loading="isLoading" :error="error" @cancel="cancelRequest" />
       </template>
     </BaseSplitPane>
   </div>

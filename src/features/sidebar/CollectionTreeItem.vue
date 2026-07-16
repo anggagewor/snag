@@ -81,6 +81,28 @@ function duplicateItem(item: CollectionItem) {
   }
   collectionsStore.insertAfter(props.collectionId, item.id, clone)
 }
+
+function focusNext(event: KeyboardEvent) {
+  const current = event.currentTarget as HTMLElement
+  const allItems = Array.from(
+    current.closest('[role="tree"], .space-y-0\\.5')?.querySelectorAll('[role="treeitem"]') || []
+  ) as HTMLElement[]
+  const index = allItems.indexOf(current)
+  if (index < allItems.length - 1) {
+    allItems[index + 1].focus()
+  }
+}
+
+function focusPrev(event: KeyboardEvent) {
+  const current = event.currentTarget as HTMLElement
+  const allItems = Array.from(
+    current.closest('[role="tree"], .space-y-0\\.5')?.querySelectorAll('[role="treeitem"]') || []
+  ) as HTMLElement[]
+  const index = allItems.indexOf(current)
+  if (index > 0) {
+    allItems[index - 1].focus()
+  }
+}
 </script>
 
 <template>
@@ -88,7 +110,17 @@ function duplicateItem(item: CollectionItem) {
   <div v-if="item.type === 'folder'">
     <div
       class="flex items-center gap-1 px-2 py-1 rounded text-xs hover:bg-surface-hover cursor-pointer group/item"
+      role="treeitem"
+      :aria-expanded="isExpanded(item.id)"
+      :aria-label="item.name"
+      tabindex="0"
       @click="toggleExpand(item.id)"
+      @keydown.enter.prevent="toggleExpand(item.id)"
+      @keydown.space.prevent="toggleExpand(item.id)"
+      @keydown.right.prevent="!isExpanded(item.id) && toggleExpand(item.id)"
+      @keydown.left.prevent="isExpanded(item.id) && toggleExpand(item.id)"
+      @keydown.down.prevent="focusNext($event)"
+      @keydown.up.prevent="focusPrev($event)"
     >
       <ChevronRight
         class="w-3 h-3 text-muted transition-transform flex-shrink-0"
@@ -156,7 +188,14 @@ function duplicateItem(item: CollectionItem) {
   <div
     v-else-if="item.type === 'request' && item.request"
     class="flex items-center gap-1.5 px-2 py-1 rounded text-xs hover:bg-surface-hover cursor-pointer group/item"
+    role="treeitem"
+    :aria-label="`${item.request.method} ${item.name}`"
+    tabindex="0"
     @click="openRequest(item)"
+    @keydown.enter.prevent="openRequest(item)"
+    @keydown.space.prevent="openRequest(item)"
+    @keydown.down.prevent="focusNext($event)"
+    @keydown.up.prevent="focusPrev($event)"
   >
     <BaseBadge :method="item.request.method" />
     <input

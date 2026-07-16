@@ -142,12 +142,20 @@ provide('treeContext', treeContext)
 </script>
 
 <template>
-  <div class="space-y-0.5">
+  <div class="space-y-0.5" role="tree" aria-label="Collections">
     <div v-for="collection in collectionsStore.collections" :key="collection.id">
       <!-- Collection header -->
       <div
         class="flex items-center gap-1 px-2 py-1.5 rounded text-sm hover:bg-surface-hover cursor-pointer group"
+        role="treeitem"
+        :aria-expanded="isExpanded(collection.id)"
+        :aria-label="collection.name"
+        tabindex="0"
         @click="toggleExpand(collection.id)"
+        @keydown.enter.prevent="toggleExpand(collection.id)"
+        @keydown.space.prevent="toggleExpand(collection.id)"
+        @keydown.right.prevent="!isExpanded(collection.id) && toggleExpand(collection.id)"
+        @keydown.left.prevent="isExpanded(collection.id) && toggleExpand(collection.id)"
       >
         <ChevronRight
           class="w-3.5 h-3.5 text-muted transition-transform flex-shrink-0"

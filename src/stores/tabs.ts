@@ -1,11 +1,15 @@
 import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 
 import { useCollectionsStore } from '@/stores/collections'
+import { useStorage } from '@/composables/useStorage'
+import { debounce } from '@/utils/debounce'
 import type { UUID } from '@/types/common'
 import type { CollectionItem } from '@/types/collection'
 import type { RequestConfig, ResponseData } from '@/types/request'
 import { createEmptyRequest } from '@/types/request'
+
+const STORAGE_FILE = 'tabs.json'
 
 export interface Tab {
   id: UUID
@@ -18,12 +22,46 @@ export interface Tab {
   sourceId?: string
 }
 
+interface TabsSnapshot {
+  tabs: Tab[]
+  activeTabId: UUID | null
+}
+
 export const useTabsStore = defineStore('tabs', () => {
   const tabs = ref<Tab[]>([])
   const activeTabId = ref<UUID | null>(null)
+  const isLoaded = ref(false)
+
+  const { read, write } = useStorage()
 
   const activeTab = computed(() => tabs.value.find((t) => t.id === activeTabId.value) || null)
   const tabCount = computed(() => tabs.value.length)
+
+  async function persist() {
+    const snapshot: TabsSnapshot = {
+      tabs: tabs.value.map((t) => ({
+        ...t,
+        // Don't persist response data (can be large, stale)
+        response: null,
+      })),
+      activeTabId: activeTabId.value,
+    }
+    await write(STORAGE_FILE, snapshot)
+  }
+
+  const save = debounce(persist, 500)
+
+  async function load() {
+    const data = await read<TabsSnapshot>(STORAGE_FILE, { tabs: [], activeTabId: null })
+    tabs.value = data.tabs
+    activeTabId.value = data.activeTabId
+    isLoaded.value = true
+  }
+
+  // Auto-persist on tab changes
+  watch([tabs, activeTabId], () => {
+    if (isLoaded.value) save()
+  }, { deep: true })
 
   /**
    * Open a request tab. If sourceId is provided and a tab with the same sourceId
@@ -193,6 +231,8 @@ export const useTabsStore = defineStore('tabs', () => {
     activeTabId,
     activeTab,
     tabCount,
+    isLoaded,
+    load,
     openRequestTab,
     openSettingsTab,
     openEnvironmentsTab,
