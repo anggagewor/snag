@@ -102,10 +102,12 @@ async function handleImport() {
       // Create collection in workspace and import items
       const created = await workspaceStore.createCollection(collection.name)
 
-      // Write each request as individual file and build tree
+      // Write each request as individual file and build the tree structure
       const { ulid } = await import('@/domain')
       type TreeNode = import('@/domain').TreeNode
       type FolderId = import('@/domain').FolderId
+      type RequestId = import('@/domain').RequestId
+      type Request = import('@/domain').Request
 
       async function importItems(items: any[]): Promise<TreeNode[]> {
         const nodes: TreeNode[] = []
@@ -115,13 +117,15 @@ async function handleImport() {
             const children = item.items ? await importItems(item.items) : []
             nodes.push({ type: 'folder', id: folderId, name: item.name, children })
           } else if (item.type === 'request' && item.request) {
-            const req = await workspaceStore.createRequest(created.id as any, null, {
-              name: item.name,
+            const requestId = ulid() as RequestId
+            const timestamp = new Date().toISOString()
+
+            // Build domain Request object
+            const req: Request = {
+              id: requestId,
+              name: item.name || 'Untitled Request',
+              protocol: 'rest',
               method: item.request.method || 'GET',
-            })
-            // Save full request data
-            const updated = {
-              ...req,
               url: item.request.url || '',
               headers: (item.request.headers || []).map((h: any) => ({ key: h.key, value: h.value, enabled: h.enabled ?? true })),
               params: (item.request.params || []).map((p: any) => ({ key: p.key, value: p.value, enabled: p.enabled ?? true })),
@@ -134,14 +138,21 @@ async function handleImport() {
               auth: item.request.auth || { type: 'none' as const },
               preRequest: item.request.preRequest || '',
               tests: item.request.tests || '',
+              meta: { createdAt: timestamp, updatedAt: timestamp },
             }
-            await workspaceStore.saveRequest(updated)
+
+            // Write request file only (don't modify collection tree)
+            await workspaceStore.saveRequest(req)
+            nodes.push({ type: 'request', requestId })
           }
         }
         return nodes
       }
 
-      await importItems(collection.items)
+      const tree = await importItems(collection.items)
+
+      // Set the collection tree to the imported folder structure
+      await workspaceStore.saveCollectionTree(created.id as any, tree)
       await workspaceStore.reloadCollection(created.id as any)
       importSuccess.value = `Imported "${collection.name}" with ${countRequests(collection.items)} requests`
     }

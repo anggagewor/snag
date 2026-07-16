@@ -19,6 +19,7 @@ import type {
   Workspace,
   WorkspaceEntry,
   Collection,
+  TreeNode,
   Request,
   Environment,
 } from '@/domain'
@@ -200,6 +201,13 @@ export const useWorkspaceStore = defineStore('workspace', () => {
     const service = useWorkspaceService()
     const updated = await service.getCollection(id)
     collections.value = collections.value.map(c => c.id === id ? updated : c)
+  }
+
+  async function saveCollectionTree(id: CollectionId, items: TreeNode[]): Promise<void> {
+    const service = useWorkspaceService()
+    const collection = await service.getCollection(id)
+    await service.saveCollection({ ...collection, items })
+    collections.value = collections.value.map(c => c.id === id ? { ...collection, items } : c)
   }
 
   // ─── Tree Operations ───────────────────────────────────────────
@@ -410,6 +418,7 @@ export const useWorkspaceStore = defineStore('workspace', () => {
     deleteCollection,
     renameCollection,
     reloadCollection,
+    saveCollectionTree,
 
     // Tree
     addFolder,
