@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onBeforeUnmount } from 'vue'
 
 import { CheckCircle, XCircle, Terminal, ChevronDown } from 'lucide-vue-next'
 
@@ -146,6 +146,19 @@ const activeSnippets = computed(() =>
 )
 
 const showSnippets = ref(false)
+const snippetBtnRef = ref<HTMLElement | null>(null)
+const dropdownStyle = ref<{ top: string; left: string }>({ top: '0px', left: '0px' })
+
+function toggleSnippets() {
+  showSnippets.value = !showSnippets.value
+  if (showSnippets.value && snippetBtnRef.value) {
+    const rect = snippetBtnRef.value.getBoundingClientRect()
+    dropdownStyle.value = {
+      top: `${rect.bottom + 4}px`,
+      left: `${rect.left}px`,
+    }
+  }
+}
 
 function insertSnippet(snippet: Snippet) {
   const current = activeScript.value === 'pre-request' ? preRequestScript.value : testScript.value
@@ -158,6 +171,21 @@ function insertSnippet(snippet: Snippet) {
   }
   showSnippets.value = false
 }
+
+function handleClickOutside(e: MouseEvent) {
+  if (!snippetBtnRef.value?.contains(e.target as Node)) {
+    showSnippets.value = false
+  }
+}
+
+// Close dropdown on outside click
+if (typeof document !== 'undefined') {
+  document.addEventListener('click', handleClickOutside)
+}
+
+onBeforeUnmount(() => {
+  document.removeEventListener('click', handleClickOutside)
+})
 </script>
 
 <template>
@@ -224,27 +252,32 @@ function insertSnippet(snippet: Snippet) {
     <!-- Snippets dropdown -->
     <div class="relative">
       <button
+        ref="snippetBtnRef"
         class="flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-accent hover:bg-accent/5 border border-border rounded transition-colors"
-        @click="showSnippets = !showSnippets"
+        @click.stop="toggleSnippets"
       >
         <ChevronDown class="w-3 h-3 transition-transform" :class="{ 'rotate-180': showSnippets }" />
         Snippets
       </button>
 
-      <div
-        v-if="showSnippets"
-        class="absolute left-0 top-full mt-1 w-[280px] bg-surface border border-border rounded-lg shadow-lg z-10 max-h-[220px] overflow-y-auto"
-      >
-        <button
-          v-for="snippet in activeSnippets"
-          :key="snippet.label"
-          class="w-full flex flex-col gap-0.5 px-3 py-2 text-left hover:bg-surface-hover transition-colors border-b border-border last:border-b-0"
-          @click="insertSnippet(snippet)"
+      <Teleport to="body">
+        <div
+          v-if="showSnippets"
+          class="fixed w-[280px] bg-surface border border-border rounded-lg shadow-lg z-[9999] max-h-[220px] overflow-y-auto"
+          :style="dropdownStyle"
+          @click.stop
         >
-          <span class="text-xs font-medium text-primary">{{ snippet.label }}</span>
-          <span class="text-[10px] font-mono text-muted truncate">{{ snippet.code.split('\n')[0] }}</span>
-        </button>
-      </div>
+          <button
+            v-for="snippet in activeSnippets"
+            :key="snippet.label"
+            class="w-full flex flex-col gap-0.5 px-3 py-2 text-left hover:bg-surface-hover transition-colors border-b border-border last:border-b-0"
+            @click="insertSnippet(snippet)"
+          >
+            <span class="text-xs font-medium text-primary">{{ snippet.label }}</span>
+            <span class="text-[10px] font-mono text-muted truncate">{{ snippet.code.split('\n')[0] }}</span>
+          </button>
+        </div>
+      </Teleport>
     </div>
 
     <!-- Test Results -->

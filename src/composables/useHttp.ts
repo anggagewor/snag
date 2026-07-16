@@ -141,7 +141,21 @@ export function useHttp() {
     let finalUrl = ''
 
     try {
-      const url = buildUrl(request.url, request.params, collectionVariables)
+      // Resolve path parameters (:param → value) before building the full URL
+      let requestUrl = request.url
+      if (request.pathParams?.length) {
+        for (const param of request.pathParams) {
+          if (param.enabled && param.key && param.value) {
+            const resolvedValue = resolve(param.value, collectionVariables)
+            requestUrl = requestUrl.replace(
+              new RegExp(`:${param.key}\\b`, 'g'),
+              encodeURIComponent(resolvedValue)
+            )
+          }
+        }
+      }
+
+      const url = buildUrl(requestUrl, request.params, collectionVariables)
 
       // Add api-key to query if configured
       finalUrl = url

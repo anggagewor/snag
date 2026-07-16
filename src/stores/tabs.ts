@@ -95,6 +95,7 @@ export const useTabsStore = defineStore('tabs', () => {
         url: '',
         headers: [],
         params: [],
+        pathParams: [],
         body: { type: 'none', content: '' },
         auth: { type: 'none' },
         preRequest: '',

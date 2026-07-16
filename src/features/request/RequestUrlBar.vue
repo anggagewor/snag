@@ -48,10 +48,22 @@ const methodOptions: SelectOption[] = [
 
 const currentMethod = computed(() => props.request.method)
 
-// Resolved URL preview (includes env vars)
+// Resolved URL preview (includes env vars and path params)
 const resolvedUrl = computed(() => {
   if (!props.request.url) return ''
-  return workspaceStore.resolveVariablesInString(props.request.url)
+  let url = workspaceStore.resolveVariablesInString(props.request.url)
+  // Also resolve path params for the preview
+  if (props.request.pathParams?.length) {
+    for (const param of props.request.pathParams) {
+      if (param.enabled && param.key && param.value) {
+        url = url.replace(
+          new RegExp(`:${param.key}\\b`, 'g'),
+          param.value
+        )
+      }
+    }
+  }
+  return url
 })
 
 const hasUnresolvedVars = computed(() => {

@@ -375,6 +375,7 @@ export function createWorkspaceService(storage: StorageAdapter): WorkspaceServic
         url: '',
         headers: [],
         params: [],
+        pathParams: [],
         body: { type: 'none', content: '' },
         auth: { type: 'none' },
         preRequest: '',

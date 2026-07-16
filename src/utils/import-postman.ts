@@ -19,6 +19,7 @@ export interface ImportedRequest {
   url: string
   headers: { key: string; value: string; enabled: boolean }[]
   params: { key: string; value: string; enabled: boolean }[]
+  pathParams: { key: string; value: string }[]
   body: ImportedRequestBody
   auth: ImportedRequestAuth
   preRequest: string
@@ -96,6 +97,7 @@ function parseRequest(req: PostmanRequest | undefined): ImportedRequest {
       url: '',
       headers: [],
       params: [],
+      pathParams: [],
       body: { type: 'none', content: '' },
       auth: { type: 'none' },
       preRequest: '',
@@ -115,6 +117,7 @@ function parseRequest(req: PostmanRequest | undefined): ImportedRequest {
     url,
     headers,
     params,
+    pathParams: [],
     body,
     auth,
     preRequest: '',

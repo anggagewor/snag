@@ -253,6 +253,8 @@ export function historyEntryFromFile(entry: HistoryFileEntry): HistoryEntry {
     status: entry.status,
     duration: entry.duration,
     responseSize: entry.responseSize,
+    ...(entry.request && { request: entry.request }),
+    ...(entry.response && { response: entry.response }),
   }
 }
 
@@ -267,6 +269,8 @@ export function historyEntryToFile(entry: HistoryEntry): HistoryFileEntry {
     status: entry.status,
     duration: entry.duration,
     responseSize: entry.responseSize,
+    ...(entry.request && { request: entry.request }),
+    ...(entry.response && { response: entry.response }),
   }
 }
 

@@ -153,6 +153,34 @@ export interface HistoryFileEntry {
   readonly status: number
   readonly duration: number
   readonly responseSize: number
+  readonly request?: {
+    readonly headers: readonly { key: string; value: string; enabled: boolean }[]
+    readonly params: readonly { key: string; value: string; enabled: boolean }[]
+    readonly pathParams?: readonly { key: string; value: string; enabled: boolean }[]
+    readonly body: {
+      readonly type: string
+      readonly content: string
+      readonly formData?: readonly { key: string; value: string; enabled: boolean }[]
+      readonly binaryPath?: string
+    }
+    readonly auth: {
+      readonly type: string
+      readonly basic?: { readonly username: string; readonly password: string }
+      readonly bearer?: { readonly token: string }
+      readonly apiKey?: { readonly key: string; readonly value: string; readonly in: 'header' | 'query' }
+    }
+  }
+  readonly response?: {
+    readonly status: number
+    readonly statusText: string
+    readonly headers: Record<string, string>
+    readonly body: string
+    readonly size: number
+    readonly time: number
+    readonly requestHeaders?: Record<string, string>
+    readonly requestUrl?: string
+    readonly requestMethod?: string
+  }
 }
 
 // ─── Global Settings File (~/.snag/settings.json) ────────────────

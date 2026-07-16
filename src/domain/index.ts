@@ -49,6 +49,8 @@ export type {
 
 export type {
   HistoryEntry,
+  HistoryRequestSnapshot,
+  HistoryResponseSnapshot,
 } from './History'
 
 export type {
@@ -79,6 +81,8 @@ export {
   draftToRequest,
   isDirty,
   stripEmptyRows,
+  extractPathParams,
+  syncPathParams,
 } from './RequestDraft'
 
 export { ulid, ulidTimestamp } from './ulid'

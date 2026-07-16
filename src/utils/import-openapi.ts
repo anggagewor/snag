@@ -143,6 +143,7 @@ function createRequestItem(
     url: finalUrl,
     headers,
     params,
+    pathParams,
     body,
     auth,
     preRequest: '',

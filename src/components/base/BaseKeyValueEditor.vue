@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 
-import { X } from 'lucide-vue-next'
+import { X, Plus } from 'lucide-vue-next'
 
 import type { KeyValuePairEditable } from '@/domain'
 import BaseEnvInput from '@/components/base/BaseEnvInput.vue'
@@ -43,6 +43,11 @@ function updateRow(index: number, field: 'key' | 'value', value: string) {
     updated.push({ id: crypto.randomUUID(), key: '', value: '', enabled: true })
   }
 
+  syncRows(updated)
+}
+
+function addRow() {
+  const updated = [...rows.value, { id: crypto.randomUUID(), key: '', value: '', enabled: true }]
   syncRows(updated)
 }
 
@@ -119,5 +124,15 @@ function toggleRow(index: number) {
         </button>
       </div>
     </div>
+
+    <!-- Add Row button -->
+    <button
+      v-if="!readonly"
+      class="flex items-center gap-1.5 px-3 py-1.5 text-xs text-muted hover:text-primary transition-colors mt-1"
+      @click="addRow"
+    >
+      <Plus class="w-3.5 h-3.5" />
+      Add Row
+    </button>
   </div>
 </template>

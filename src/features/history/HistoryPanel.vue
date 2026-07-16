@@ -85,6 +85,71 @@ function openEntry(entry: HistoryEntry) {
     if (tab.requestDraft) {
       tab.requestDraft.method = entry.method
       tab.requestDraft.url = entry.url
+
+      // Restore full request from snapshot
+      if (entry.request) {
+        tab.requestDraft.headers = (entry.request.headers || []).map(h => ({
+          id: crypto.randomUUID(),
+          key: h.key,
+          value: h.value,
+          enabled: h.enabled,
+        }))
+        tab.requestDraft.params = (entry.request.params || []).map(p => ({
+          id: crypto.randomUUID(),
+          key: p.key,
+          value: p.value,
+          enabled: p.enabled,
+        }))
+        if (entry.request.pathParams) {
+          tab.requestDraft.pathParams = entry.request.pathParams.map(p => ({
+            id: crypto.randomUUID(),
+            key: p.key,
+            value: p.value,
+            enabled: p.enabled,
+          }))
+        }
+        tab.requestDraft.body = {
+          type: (entry.request.body.type || 'none') as any,
+          content: entry.request.body.content || '',
+          ...(entry.request.body.formData && {
+            formData: entry.request.body.formData.map(f => ({
+              id: crypto.randomUUID(),
+              key: f.key,
+              value: f.value,
+              enabled: f.enabled,
+            })),
+          }),
+          ...(entry.request.body.binaryPath && { binaryPath: entry.request.body.binaryPath }),
+        }
+        tab.requestDraft.auth = {
+          type: (entry.request.auth.type || 'none') as any,
+          ...(entry.request.auth.basic && { basic: { ...entry.request.auth.basic } }),
+          ...(entry.request.auth.bearer && { bearer: { ...entry.request.auth.bearer } }),
+          ...(entry.request.auth.apiKey && { apiKey: { ...entry.request.auth.apiKey } }),
+        }
+      }
+    }
+
+    // Restore response from snapshot
+    if (entry.response) {
+      tab.response = {
+        status: entry.response.status,
+        statusText: entry.response.statusText,
+        headers: entry.response.headers,
+        body: entry.response.body,
+        size: entry.response.size,
+        time: entry.response.time,
+        requestHeaders: entry.response.requestHeaders
+          ?? (entry.request
+            ? Object.fromEntries(
+                (entry.request.headers || [])
+                  .filter(h => h.enabled)
+                  .map(h => [h.key, h.value])
+              )
+            : undefined),
+        requestUrl: entry.response.requestUrl ?? entry.url,
+        requestMethod: entry.response.requestMethod ?? entry.method,
+      }
     }
   }
 }

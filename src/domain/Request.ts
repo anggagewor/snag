@@ -40,6 +40,7 @@ export interface Request {
   readonly url: string
   readonly headers: readonly KeyValuePair[]
   readonly params: readonly KeyValuePair[]
+  readonly pathParams?: readonly KeyValuePair[]
   readonly body: RequestBody
   readonly auth: RequestAuth
   readonly preRequest: string

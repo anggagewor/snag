@@ -129,6 +129,7 @@ export function parseCurl(input: string): RequestDraft {
     url,
     headers,
     params: [],
+    pathParams: [],
     body: body
       ? { type: isJson ? 'json' : 'text', content: body }
       : { type: 'none', content: '' },

@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 
 import { useTabsStore } from '@/stores/tabs'
 import type { Tab } from '@/stores/tabs'
 import type { KeyValuePairEditable } from '@/domain'
+import { syncPathParams } from '@/domain'
 import BaseKeyValueEditor from '@/components/base/BaseKeyValueEditor.vue'
 
 const props = defineProps<{
@@ -15,6 +16,19 @@ const tabsStore = useTabsStore()
 const viewMode = ref<'table' | 'bulk'>('table')
 
 const params = computed(() => props.tab.requestDraft?.params || [])
+const pathParams = computed(() => props.tab.requestDraft?.pathParams || [])
+const hasPathParams = computed(() => pathParams.value.length > 0)
+
+// Sync path params when URL changes
+watch(
+  () => props.tab.requestDraft?.url,
+  (url) => {
+    if (url && props.tab.requestDraft) {
+      props.tab.requestDraft.pathParams = syncPathParams(url, props.tab.requestDraft.pathParams)
+    }
+  },
+  { immediate: true },
+)
 
 const bulkText = computed(() => {
   return params.value
@@ -26,6 +40,15 @@ const bulkText = computed(() => {
 function updateParams(value: KeyValuePairEditable[]) {
   if (props.tab.requestDraft) {
     props.tab.requestDraft.params = value
+    tabsStore.recomputeDirty(props.tab.id)
+  }
+}
+
+function updatePathParam(index: number, value: string) {
+  if (props.tab.requestDraft) {
+    const updated = [...props.tab.requestDraft.pathParams]
+    updated[index] = { ...updated[index], value }
+    props.tab.requestDraft.pathParams = updated
     tabsStore.recomputeDirty(props.tab.id)
   }
 }
@@ -55,8 +78,41 @@ function onBulkChange(e: Event) {
 
 <template>
   <div>
+    <!-- Path Variables -->
+    <div v-if="hasPathParams" class="mb-4">
+      <div class="flex items-center px-1 pb-2">
+        <span class="text-xs font-medium text-secondary">Path Variables</span>
+      </div>
+
+      <!-- Path params header -->
+      <div class="grid grid-cols-[1fr_1fr] gap-0 text-xs text-muted border-b border-border">
+        <span class="px-2 py-1.5">Key</span>
+        <span class="px-2 py-1.5 border-l border-border">Value</span>
+      </div>
+
+      <!-- Path param rows -->
+      <div
+        v-for="(param, index) in pathParams"
+        :key="param.id"
+        class="grid grid-cols-[1fr_1fr] gap-0 items-center border-b border-border"
+      >
+        <div class="px-2 py-1.5 text-xs font-mono text-primary">
+          :{{ param.key }}
+        </div>
+        <div class="border-l border-border">
+          <input
+            :value="param.value"
+            :placeholder="`Enter ${param.key}`"
+            class="w-full text-xs font-mono text-primary bg-transparent px-2 py-1.5 focus:outline-none focus:bg-surface-hover placeholder:text-muted"
+            @input="updatePathParam(index, ($event.target as HTMLInputElement).value)"
+          />
+        </div>
+      </div>
+    </div>
+
     <!-- Query Params header + toggle -->
     <div class="flex items-center justify-between px-1 pb-2">
+      <span class="text-xs font-medium text-secondary">Query Parameters</span>
       <div class="flex rounded border border-border overflow-hidden ml-auto">
         <button
           class="px-2 py-0.5 text-[10px] font-medium transition-colors"

@@ -38,6 +38,7 @@ export interface RequestDraft {
   url: string
   headers: KeyValuePairEditable[]
   params: KeyValuePairEditable[]
+  pathParams: KeyValuePairEditable[]
   body: RequestBodyDraft
   auth: RequestAuthDraft
   preRequest: string
@@ -70,6 +71,50 @@ function isEmptyRow(kv: KeyValuePairEditable): boolean {
   return kv.key === '' && kv.value === ''
 }
 
+const PATH_PARAM_REGEX = /:([a-zA-Z_]\w*)/g
+
+/**
+ * Extract path parameter names from a URL (e.g., `:company` → key: 'company').
+ */
+export function extractPathParams(url: string): KeyValuePairEditable[] {
+  const params: KeyValuePairEditable[] = []
+  const seen = new Set<string>()
+  let match: RegExpExecArray | null
+
+  // Reset regex state
+  PATH_PARAM_REGEX.lastIndex = 0
+  while ((match = PATH_PARAM_REGEX.exec(url)) !== null) {
+    const name = match[1]
+    if (!seen.has(name)) {
+      seen.add(name)
+      params.push({
+        id: crypto.randomUUID(),
+        key: name,
+        value: '',
+        enabled: true,
+      })
+    }
+  }
+  return params
+}
+
+/**
+ * Sync path params: keep existing values for params that still exist in URL,
+ * add new ones, remove ones no longer in URL.
+ */
+export function syncPathParams(url: string, existing: KeyValuePairEditable[]): KeyValuePairEditable[] {
+  const freshParams = extractPathParams(url)
+  const existingMap = new Map(existing.map(p => [p.key, p]))
+
+  return freshParams.map(p => {
+    const prev = existingMap.get(p.key)
+    if (prev) {
+      return { ...prev }
+    }
+    return p
+  })
+}
+
 /**
  * Convert immutable domain Request to mutable RequestDraft.
  * Assigns crypto.randomUUID() to each KV pair for Vue :key binding.
@@ -82,6 +127,9 @@ export function requestToDraft(request: Request): RequestDraft {
     url: request.url,
     headers: request.headers.map(kvToEditable),
     params: request.params.map(kvToEditable),
+    pathParams: request.pathParams?.length
+      ? request.pathParams.map(kvToEditable)
+      : extractPathParams(request.url),
     body: {
       type: request.body.type,
       content: request.body.content,
@@ -112,6 +160,7 @@ export function requestToDraft(request: Request): RequestDraft {
 export function draftToRequest(draft: RequestDraft, originalId: RequestId, meta: RequestMeta): Request {
   const nonEmptyHeaders = draft.headers.filter(kv => !isEmptyRow(kv))
   const nonEmptyParams = draft.params.filter(kv => !isEmptyRow(kv))
+  const nonEmptyPathParams = draft.pathParams.filter(kv => !isEmptyRow(kv))
 
   const body: RequestBody = {
     type: draft.body.type,
@@ -137,6 +186,7 @@ export function draftToRequest(draft: RequestDraft, originalId: RequestId, meta:
     url: draft.url,
     headers: nonEmptyHeaders.map(editableToKv),
     params: nonEmptyParams.map(editableToKv),
+    pathParams: nonEmptyPathParams.map(editableToKv),
     body,
     auth,
     preRequest: draft.preRequest,
@@ -160,6 +210,7 @@ export function stripEmptyRows(draft: RequestDraft): object {
     url: draft.url,
     headers: draft.headers.filter(kv => !isEmptyRow(kv)).map(({ id: _, ...rest }) => rest),
     params: draft.params.filter(kv => !isEmptyRow(kv)).map(({ id: _, ...rest }) => rest),
+    pathParams: draft.pathParams.filter(kv => !isEmptyRow(kv)).map(({ id: _, ...rest }) => rest),
     body: {
       type: draft.body.type,
       content: draft.body.content,
