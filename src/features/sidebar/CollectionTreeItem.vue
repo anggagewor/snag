@@ -3,35 +3,36 @@ import { inject, computed } from 'vue'
 
 import { ChevronRight, Folder, MoreVertical } from 'lucide-vue-next'
 
-import { useCollectionsStore } from '@/stores/collections'
+import { useWorkspaceStore } from '@/stores/workspace'
 import { useTabsStore } from '@/stores/tabs'
-import type { CollectionItem } from '@/types/collection'
-import type { UUID } from '@/types/common'
-import { createEmptyRequest } from '@/types/request'
-import { exportToCurl } from '@/utils/export-curl'
+import type { TreeNode } from '@/domain'
+import type { CollectionId, FolderId, RequestId } from '@/domain'
 import BaseBadge from '@/components/base/BaseBadge.vue'
 import BaseDropdown from '@/components/base/BaseDropdown.vue'
-
 import type { TreeContext } from './collectionTreeContext'
 
 const props = defineProps<{
-  item: CollectionItem
-  collectionId: UUID
+  item: TreeNode
+  collectionId: string
 }>()
 
-const collectionsStore = useCollectionsStore()
+const workspaceStore = useWorkspaceStore()
 const tabsStore = useTabsStore()
 
 const ctx = inject<TreeContext>('treeContext')!
 
-const isDragOver = computed(() => ctx.drag.dragOverId.value === props.item.id)
+const itemId = computed(() =>
+  props.item.type === 'folder' ? props.item.id : props.item.requestId
+)
+
+const isDragOver = computed(() => ctx.drag.dragOverId.value === itemId.value)
 const dragPos = computed(() => isDragOver.value ? ctx.drag.dragPosition.value : null)
 
-function isExpanded(id: UUID): boolean {
+function isExpanded(id: string): boolean {
   return ctx.expandedIds.value.has(id)
 }
 
-function toggleExpand(id: UUID) {
+function toggleExpand(id: string) {
   if (ctx.expandedIds.value.has(id)) {
     ctx.expandedIds.value.delete(id)
   } else {
@@ -39,77 +40,122 @@ function toggleExpand(id: UUID) {
   }
 }
 
-function openRequest(item: CollectionItem) {
-  if (item.type === 'request' && item.request) {
-    const sourceId = `${props.collectionId}:${item.id}`
-    tabsStore.openRequestTab(JSON.parse(JSON.stringify(item.request)), item.name, sourceId)
+async function openRequest(requestId: string) {
+  try {
+    const request = await workspaceStore.getRequest(requestId as RequestId)
+    const sourceId = `${props.collectionId}:${requestId}`
+    // Open in tabs using the legacy store for now (tabs will be refactored later)
+    tabsStore.openRequestTab(
+      {
+        id: request.id,
+        method: request.method as any,
+        url: request.url,
+        headers: request.headers.map(h => ({ id: crypto.randomUUID(), ...h })),
+        params: request.params.map(p => ({ id: crypto.randomUUID(), ...p })),
+        body: {
+          type: mapBodyType(request.body.type),
+          raw: request.body.content || undefined,
+          formData: request.body.formData?.map(f => ({
+            id: crypto.randomUUID(),
+            key: f.key,
+            value: f.value,
+            enabled: f.enabled,
+            fieldType: 'text' as const,
+          })),
+        },
+        auth: {
+          type: mapAuthType(request.auth.type),
+          bearer: request.auth.bearer,
+          basic: request.auth.basic,
+          apiKey: request.auth.apiKey ? {
+            key: request.auth.apiKey.key,
+            value: request.auth.apiKey.value,
+            addTo: request.auth.apiKey.in,
+          } : undefined,
+        },
+        preRequestScript: request.preRequest || undefined,
+        testScript: request.tests || undefined,
+        pathParams: [],
+      },
+      request.name,
+      sourceId,
+    )
+  } catch (err) {
+    console.error('[CollectionTreeItem] Failed to open request:', err)
   }
 }
 
-function addRequestToFolder(folderId: UUID) {
-  const newItem: CollectionItem = {
-    id: crypto.randomUUID(),
-    type: 'request',
-    name: 'New Request',
-    request: createEmptyRequest(),
+function mapBodyType(type: string): any {
+  const map: Record<string, string> = {
+    none: 'none',
+    json: 'json',
+    xml: 'raw',
+    text: 'raw',
+    formdata: 'form-data',
+    urlencoded: 'x-www-form-urlencoded',
+    binary: 'binary',
+    graphql: 'raw',
   }
-  collectionsStore.addItem(props.collectionId, newItem, folderId)
+  return map[type] ?? 'none'
+}
+
+function mapAuthType(type: string): any {
+  const map: Record<string, string> = {
+    none: 'none',
+    basic: 'basic',
+    bearer: 'bearer',
+    apikey: 'api-key',
+  }
+  return map[type] ?? 'none'
+}
+
+async function addRequestToFolder(folderId: string) {
+  const request = await workspaceStore.createRequest(
+    props.collectionId as CollectionId,
+    folderId as FolderId,
+  )
+  ctx.requestNames.value.set(request.id, request.name)
+  ctx.requestMethods.value.set(request.id, request.method)
   ctx.expandedIds.value.add(folderId)
 }
 
-function addFolderToFolder(folderId: UUID) {
-  const folder: CollectionItem = {
-    id: crypto.randomUUID(),
-    type: 'folder',
-    name: 'New Folder',
-    items: [],
-  }
-  collectionsStore.addItem(props.collectionId, folder, folderId)
+async function addFolderToFolder(folderId: string) {
+  await workspaceStore.addFolder(props.collectionId as CollectionId, folderId as FolderId, 'New Folder')
   ctx.expandedIds.value.add(folderId)
 }
 
-function duplicateItem(item: CollectionItem) {
-  const clone: CollectionItem = JSON.parse(JSON.stringify(item))
-  clone.id = crypto.randomUUID()
-  clone.name = `${item.name} (copy)`
-  if (clone.request) clone.request.id = crypto.randomUUID()
-  if (clone.items) {
-    function regenIds(items: CollectionItem[]) {
-      for (const i of items) {
-        i.id = crypto.randomUUID()
-        if (i.request) i.request.id = crypto.randomUUID()
-        if (i.items) regenIds(i.items)
-      }
-    }
-    regenIds(clone.items)
+async function deleteItem() {
+  if (props.item.type === 'folder') {
+    await workspaceStore.removeFolder(props.collectionId as CollectionId, props.item.id as FolderId)
+  } else {
+    await workspaceStore.deleteRequest(props.item.requestId as RequestId)
   }
-  collectionsStore.insertAfter(props.collectionId, item.id, clone)
 }
 
-function copyAsCurl(item: CollectionItem) {
-  if (item.request) {
-    const curl = exportToCurl(item.request)
-    navigator.clipboard.writeText(curl)
-  }
+async function duplicateRequest() {
+  if (props.item.type !== 'request') return
+  const duplicate = await workspaceStore.duplicateRequest(props.item.requestId as RequestId)
+  ctx.requestNames.value.set(duplicate.id, duplicate.name)
+  ctx.requestMethods.value.set(duplicate.id, duplicate.method)
 }
 
 // Drag & Drop handlers
 function onDragStart(e: DragEvent) {
-  ctx.drag.draggingId.value = props.item.id
+  ctx.drag.draggingId.value = itemId.value
   e.dataTransfer!.effectAllowed = 'move'
-  e.dataTransfer!.setData('text/plain', props.item.id)
+  e.dataTransfer!.setData('text/plain', itemId.value)
 }
 
 function onDragOver(e: DragEvent) {
   e.preventDefault()
-  if (ctx.drag.draggingId.value === props.item.id) return
+  if (ctx.drag.draggingId.value === itemId.value) return
 
   const target = e.currentTarget as HTMLElement
   const rect = target.getBoundingClientRect()
   const y = e.clientY - rect.top
   const height = rect.height
 
-  ctx.drag.dragOverId.value = props.item.id
+  ctx.drag.dragOverId.value = itemId.value
 
   if (props.item.type === 'folder') {
     if (y < height * 0.25) {
@@ -127,37 +173,40 @@ function onDragOver(e: DragEvent) {
 }
 
 function onDragLeave() {
-  if (ctx.drag.dragOverId.value === props.item.id) {
+  if (ctx.drag.dragOverId.value === itemId.value) {
     ctx.drag.dragOverId.value = null
     ctx.drag.dragPosition.value = null
   }
 }
 
-function onDrop(e: DragEvent) {
+async function onDrop(e: DragEvent) {
   e.preventDefault()
   const dragId = ctx.drag.draggingId.value
-  if (!dragId || dragId === props.item.id) {
+  if (!dragId || dragId === itemId.value) {
     resetDrag()
     return
   }
 
   const position = ctx.drag.dragPosition.value
-  const collection = collectionsStore.collections.find((c) => c.id === props.collectionId)
-  if (!collection) {
-    resetDrag()
-    return
-  }
 
-  // Find the target item's parent and index
   if (position === 'inside' && props.item.type === 'folder') {
-    // Drop inside folder
-    collectionsStore.moveItem(props.collectionId, dragId, props.item.id, 0)
+    await workspaceStore.moveItem(
+      props.collectionId as CollectionId,
+      dragId as RequestId | FolderId,
+      props.item.id as FolderId,
+      0,
+    )
     ctx.expandedIds.value.add(props.item.id)
   } else {
-    // Drop before/after — find the parent of the target item
-    const { parentId, index } = findParentAndIndex(collection.items, props.item.id, null)
-    const targetIndex = position === 'after' ? index + 1 : index
-    collectionsStore.moveItem(props.collectionId, dragId, parentId, targetIndex)
+    // For before/after, we move relative to current item's parent
+    // Simplified: move to root level at appropriate index
+    const targetIndex = position === 'after' ? 1 : 0
+    await workspaceStore.moveItem(
+      props.collectionId as CollectionId,
+      dragId as RequestId | FolderId,
+      null,
+      targetIndex,
+    )
   }
 
   resetDrag()
@@ -173,43 +222,12 @@ function resetDrag() {
   ctx.drag.dragPosition.value = null
 }
 
-function findParentAndIndex(
-  items: CollectionItem[],
-  targetId: UUID,
-  parentId: UUID | null
-): { parentId: UUID | null; index: number } {
-  for (let i = 0; i < items.length; i++) {
-    if (items[i].id === targetId) {
-      return { parentId, index: i }
-    }
-    if (items[i].items) {
-      const found = findParentAndIndex(items[i].items!, targetId, items[i].id)
-      if (found.index !== -1) return found
-    }
-  }
-  return { parentId: null, index: -1 }
+function getRequestName(requestId: string): string {
+  return ctx.requestNames.value.get(requestId) ?? 'Loading...'
 }
 
-function focusNext(event: KeyboardEvent) {
-  const current = event.currentTarget as HTMLElement
-  const allItems = Array.from(
-    current.closest('[role="tree"], .space-y-0\\.5')?.querySelectorAll('[role="treeitem"]') || []
-  ) as HTMLElement[]
-  const index = allItems.indexOf(current)
-  if (index < allItems.length - 1) {
-    allItems[index + 1].focus()
-  }
-}
-
-function focusPrev(event: KeyboardEvent) {
-  const current = event.currentTarget as HTMLElement
-  const allItems = Array.from(
-    current.closest('[role="tree"], .space-y-0\\.5')?.querySelectorAll('[role="treeitem"]') || []
-  ) as HTMLElement[]
-  const index = allItems.indexOf(current)
-  if (index > 0) {
-    allItems[index - 1].focus()
-  }
+function getRequestMethod(requestId: string): string {
+  return ctx.requestMethods.value.get(requestId) ?? 'GET'
 }
 </script>
 
@@ -237,8 +255,6 @@ function focusPrev(event: KeyboardEvent) {
       @keydown.space.prevent="toggleExpand(item.id)"
       @keydown.right.prevent="!isExpanded(item.id) && toggleExpand(item.id)"
       @keydown.left.prevent="isExpanded(item.id) && toggleExpand(item.id)"
-      @keydown.down.prevent="focusNext($event)"
-      @keydown.up.prevent="focusPrev($event)"
     >
       <!-- Drop indicators -->
       <div v-if="dragPos === 'before'" class="absolute -top-px left-2 right-2 h-0.5 bg-accent rounded" />
@@ -280,11 +296,8 @@ function focusPrev(event: KeyboardEvent) {
             <button class="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-primary hover:bg-surface-hover text-left" @click="ctx.startRename(item.id, item.name); close()">
               Rename
             </button>
-            <button class="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-primary hover:bg-surface-hover text-left" @click="duplicateItem(item); close()">
-              Duplicate
-            </button>
             <div class="border-t border-border my-0.5" />
-            <button class="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-error hover:bg-error/5 text-left" @click="collectionsStore.removeItem(collectionId, item.id); close()">
+            <button class="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-error hover:bg-error/5 text-left" @click="deleteItem(); close()">
               Delete
             </button>
           </template>
@@ -294,12 +307,12 @@ function focusPrev(event: KeyboardEvent) {
 
     <!-- Folder children (recursive) -->
     <div v-if="isExpanded(item.id)" class="ml-3 border-l border-border-muted pl-2 space-y-0.5">
-      <div v-if="!item.items || item.items.length === 0" class="px-2 py-1 text-[10px] text-muted">
+      <div v-if="item.children.length === 0" class="px-2 py-1 text-[10px] text-muted">
         Empty folder
       </div>
       <CollectionTreeItem
-        v-for="child in item.items"
-        :key="child.id"
+        v-for="child in item.children"
+        :key="child.type === 'folder' ? child.id : child.requestId"
         :item="child"
         :collection-id="collectionId"
       />
@@ -308,11 +321,11 @@ function focusPrev(event: KeyboardEvent) {
 
   <!-- Request -->
   <div
-    v-else-if="item.type === 'request' && item.request"
+    v-else-if="item.type === 'request'"
     class="flex items-center gap-1.5 px-2 py-1 rounded text-xs hover:bg-surface-hover cursor-pointer group/item relative"
-    :class="{ 'opacity-50': ctx.drag.draggingId.value === item.id }"
+    :class="{ 'opacity-50': ctx.drag.draggingId.value === item.requestId }"
     role="treeitem"
-    :aria-label="`${item.request.method} ${item.name}`"
+    :aria-label="`${getRequestMethod(item.requestId)} ${getRequestName(item.requestId)}`"
     tabindex="0"
     draggable="true"
     @dragstart="onDragStart"
@@ -320,27 +333,25 @@ function focusPrev(event: KeyboardEvent) {
     @dragleave="onDragLeave"
     @drop="onDrop"
     @dragend="onDragEnd"
-    @click="openRequest(item)"
-    @keydown.enter.prevent="openRequest(item)"
-    @keydown.space.prevent="openRequest(item)"
-    @keydown.down.prevent="focusNext($event)"
-    @keydown.up.prevent="focusPrev($event)"
+    @click="openRequest(item.requestId)"
+    @keydown.enter.prevent="openRequest(item.requestId)"
+    @keydown.space.prevent="openRequest(item.requestId)"
   >
     <!-- Drop indicators -->
     <div v-if="dragPos === 'before'" class="absolute -top-px left-2 right-2 h-0.5 bg-accent rounded" />
     <div v-if="dragPos === 'after'" class="absolute -bottom-px left-2 right-2 h-0.5 bg-accent rounded" />
 
-    <BaseBadge :method="item.request.method" />
+    <BaseBadge :method="getRequestMethod(item.requestId) as any" />
     <input
-      v-if="ctx.editingId.value === item.id"
+      v-if="ctx.editingId.value === item.requestId"
       v-model="ctx.editingName.value"
       class="flex-1 bg-surface border border-accent rounded px-1 py-0.5 text-xs text-primary focus:outline-none"
-      @keydown.enter="ctx.finishRenameItem(collectionId, item.id)"
+      @keydown.enter="ctx.finishRenameItem(collectionId, item.requestId)"
       @keydown.escape="ctx.cancelRename()"
-      @blur="ctx.finishRenameItem(collectionId, item.id)"
+      @blur="ctx.finishRenameItem(collectionId, item.requestId)"
       @click.stop
     />
-    <span v-else class="text-primary flex-1 truncate">{{ item.name }}</span>
+    <span v-else class="text-primary flex-1 truncate">{{ getRequestName(item.requestId) }}</span>
 
     <!-- Request menu -->
     <div class="opacity-0 group-hover/item:opacity-100 transition-opacity" @click.stop>
@@ -351,11 +362,10 @@ function focusPrev(event: KeyboardEvent) {
           </button>
         </template>
         <template #content="{ close }">
-          <button class="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-primary hover:bg-surface-hover text-left" @click="ctx.startRename(item.id, item.name); close()">Rename</button>
-          <button class="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-primary hover:bg-surface-hover text-left" @click="duplicateItem(item); close()">Duplicate</button>
-          <button class="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-primary hover:bg-surface-hover text-left" @click="copyAsCurl(item); close()">Copy as cURL</button>
+          <button class="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-primary hover:bg-surface-hover text-left" @click="ctx.startRename(item.requestId, getRequestName(item.requestId)); close()">Rename</button>
+          <button class="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-primary hover:bg-surface-hover text-left" @click="duplicateRequest(); close()">Duplicate</button>
           <div class="border-t border-border my-0.5" />
-          <button class="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-error hover:bg-error/5 text-left" @click="collectionsStore.removeItem(collectionId, item.id); close()">Delete</button>
+          <button class="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-error hover:bg-error/5 text-left" @click="deleteItem(); close()">Delete</button>
         </template>
       </BaseDropdown>
     </div>

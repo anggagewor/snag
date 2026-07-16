@@ -15,20 +15,28 @@ Snag adalah Postman clone yang dibangun dengan Tauri 2 + Vue 3 + TypeScript. Des
 - **Reason:** Bypass CORS restrictions, native performance, support semua HTTP methods + custom headers tanpa browser limitations
 - **Consequence:** Request dikirim dari Rust side, bukan browser fetch
 
-### ADR-002: JSON File-Based Storage
-- **Decision:** Persistence menggunakan JSON files via Tauri filesystem API
-- **Reason:** Simple, human-readable, easy to debug, export-friendly. Bisa migrate ke SQLite later kalau perlu performance
-- **Consequence:** File locking perlu di-handle manual, large collections mungkin slow (acceptable untuk v1)
-- **Storage location:** App data directory (Tauri `appDataDir`)
-- **File structure:**
+### ADR-002: Workspace-Based Storage (v1)
+- **Decision:** Workspace sebagai unit storage utama. File-per-request. Storage is an implementation detail.
+- **Reason:** Git-friendly (1 request = 1 file, minimal conflict), portable (zip workspace = done), lazy-loadable, scalable
+- **Consequence:** Migration dari v0 (single-file) ke v1 (workspace). Semua akses data melalui WorkspaceService.
+- **Storage layout:**
   ```
-  {appDataDir}/
-  ├── collections.json
-  ├── environments.json
-  ├── history.json
+  ~/.snag/                          (Global — milik user)
   ├── settings.json
-  └── tabs.json
+  ├── workspaces.json               (Registry/cache)
+  ├── history/                      (Global, cross-workspace)
+  └── scratch/                      (Scratch Pad workspace)
+
+  <user-chosen-path>/               (Workspace — portable unit)
+  ├── workspace.json                (Manifest: type, version, id, name, collections[])
+  ├── collections/<ULID>.collection.json  (Tree only: folders + request ID refs)
+  ├── requests/<ULID>.request.json        (Full request data, self-contained)
+  ├── environments/<ULID>.environment.json
+  └── settings.json                 (Workspace-level settings)
   ```
+- **File format contract:** Setiap JSON file wajib punya `{ "type": "...", "version": 1, "id": "ULID", ... }`
+- **ID format:** ULID (sortable, short, filename-friendly)
+- **ADR docs:** `docs/adr/001-workspace-storage-format.md`, `docs/adr/002-workspace-api-architecture.md`
 
 ### ADR-003: Custom UI Components (No Library)
 - **Decision:** Bikin base component sendiri dari scratch dengan Tailwind
@@ -295,33 +303,42 @@ Components never own application state.
 
 ## Data Flow
 
+## Data Flow
+
+```
 UI Components
     ↓
-Feature Components
+Pinia Stores (workspaceStore, tabsStore, etc.)
     ↓
-Pinia Store Actions
+Services (WorkspaceService, HistoryService, SettingsService)
     ↓
-Composables (useHttp, useScriptRunner, useStorage)
+StorageAdapter
     ↓
-Tauri Plugins
-    ↓
-Filesystem / HTTP
+Tauri FS Plugin / Platform
+```
 
-Never call Tauri plugins directly from UI components.
+Layer rules:
+- UI → Store only (never call services directly)
+- Store → Service only (never call storage directly)
+- Service → StorageAdapter only (never call Tauri directly)
+- Domain is imported by all layers but imports nothing
 
 ## Source of Truth
 
-Collections
-→ collections store
+Workspace, Collections, Requests, Environments
+→ workspaceStore (delegates to WorkspaceService)
 
 Tabs
 → tabs store
 
-History
-→ history store
+History (global, cross-workspace)
+→ HistoryService
 
-Environment variables
-→ environments store
+Settings (global + workspace merged)
+→ SettingsService
+
+Workspace Registry
+→ RegistryService
 
 HTTP execution
 → useHttp()
@@ -330,7 +347,7 @@ Script execution
 → useScriptRunner()
 
 Persistence
-→ useStorage()
+→ StorageAdapter (replaces old useStorage composable)
 
 ## Extension Points
 
@@ -362,32 +379,56 @@ Persistence
 
 ```
 src/
+├── domain/                # Pure TypeScript domain models (zero deps)
+│   ├── ids.ts             # Branded ID types (WorkspaceId, RequestId, etc.)
+│   ├── http.ts            # HttpMethod, ProtocolType, KeyValuePair
+│   ├── ulid.ts            # ULID generator
+│   ├── Workspace.ts       # Workspace, WorkspaceEntry
+│   ├── Collection.ts      # Collection, TreeNode, Folder, RequestRef
+│   ├── Request.ts         # Request, Body, Auth, Meta
+│   ├── Environment.ts     # Environment, EnvironmentVariable
+│   ├── History.ts         # HistoryEntry
+│   └── Settings.ts        # GlobalSettings, WorkspaceSettings
+├── storage/               # Persistence layer (imports domain only)
+│   ├── models.ts          # File format schemas (type + version)
+│   ├── StorageAdapter.ts  # Interface (swappable backend)
+│   ├── TauriStorageAdapter.ts # Concrete: Tauri FS + browser fallback
+│   └── mappers.ts         # Domain ↔ File conversion
+├── services/              # Business logic (imports domain + storage)
+│   ├── WorkspaceService.ts    # Interface + createWorkspaceService.ts
+│   ├── RegistryService.ts     # Interface + createRegistryService.ts
+│   ├── HistoryService.ts      # Interface + createHistoryService.ts
+│   ├── SettingsService.ts     # Interface + createSettingsService.ts
+│   ├── provider.ts            # Singleton service instances
+│   ├── migration.ts           # v0 → v1 migration
+│   ├── scratch.ts             # Scratch Pad init
+│   └── startup.ts             # App startup orchestrator
+├── stores/                # Pinia stores (imports domain + services)
+│   ├── workspace.ts       # NEW: workspace-aware store
+│   ├── collections.ts     # LEGACY: will be removed after UI migration
+│   ├── environments.ts    # LEGACY
+│   ├── history.ts         # LEGACY
+│   ├── settings.ts        # LEGACY
+│   └── tabs.ts            # Will be updated to use workspace store
 ├── components/base/       # Generic, reusable UI components
 ├── composables/           # Shared reactive logic
 │   ├── useHttp.ts         # REST request execution
 │   ├── useScriptRunner.ts # Pre-request & test script sandbox
-│   ├── useStorage.ts      # File persistence
+│   ├── useStorage.ts      # LEGACY (replaced by StorageAdapter)
 │   ├── useKeyboard.ts     # Global keyboard shortcuts
 │   └── useTheme.ts        # Theme management
 ├── features/              # Feature-specific components
 │   ├── environments/      # Environment management
 │   ├── history/           # Request history
-│   ├── request/           # Request builder (URL bar, body, headers, auth, scripts)
+│   ├── request/           # Request builder
 │   ├── response/          # Response viewer
 │   ├── search/            # Command palette (Cmd+K)
 │   ├── settings/          # Settings panel
 │   ├── sidebar/           # Collection tree, import modal
 │   └── tabs/              # Tab bar, tab content router
 ├── layouts/               # App layout shells
-├── stores/                # Pinia stores
-├── types/                 # TypeScript type definitions (per protocol)
+├── types/                 # LEGACY type definitions (being replaced by domain/)
 ├── utils/                 # Pure utility functions
-│   ├── curl-parser.ts     # Parse cURL commands
-│   ├── export-curl.ts     # Generate cURL from request
-│   ├── export-postman.ts  # Export to Postman format
-│   ├── import-openapi.ts  # Import OpenAPI/Swagger
-│   ├── import-postman.ts  # Import Postman collections
-│   └── ...
 └── assets/styles/         # Global styles, Tailwind config
 ```
 

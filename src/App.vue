@@ -1,19 +1,19 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { onMounted, ref, inject } from 'vue'
 
 import { useTheme } from '@/composables/useTheme'
 import { useKeyboard } from '@/composables/useKeyboard'
-import { useCollectionsStore } from '@/stores/collections'
-import { useEnvironmentsStore } from '@/stores/environments'
 import { useHistoryStore } from '@/stores/history'
 import { useSettingsStore } from '@/stores/settings'
 import { useTabsStore } from '@/stores/tabs'
+import { useWorkspaceStore } from '@/stores/workspace'
 import DefaultLayout from '@/layouts/DefaultLayout.vue'
 import SidebarPanel from '@/features/sidebar/SidebarPanel.vue'
 import TabBar from '@/features/tabs/TabBar.vue'
 import TabContent from '@/features/tabs/TabContent.vue'
 import BaseErrorBoundary from '@/components/base/BaseErrorBoundary.vue'
 import SearchPalette from '@/features/search/SearchPalette.vue'
+import type { StartupResult } from '@/services/startup'
 
 // Initialize theme
 const { loadTheme } = useTheme()
@@ -43,22 +43,45 @@ onMounted(() => {
   })
 })
 
-// Load persisted data
-const collectionsStore = useCollectionsStore()
-const environmentsStore = useEnvironmentsStore()
+// Startup result from main.ts (services already initialized)
+const startupResult = inject<StartupResult | undefined>('startupResult')
+
+// Load persisted data (legacy stores still needed for history, settings, tabs)
 const historyStore = useHistoryStore()
 const settingsStore = useSettingsStore()
 const tabsStore = useTabsStore()
+const workspaceStore = useWorkspaceStore()
 
 onMounted(async () => {
+  // Load legacy stores that are still in use
   await Promise.all([
-    collectionsStore.load(),
-    environmentsStore.load(),
     historyStore.load(),
     settingsStore.load(),
     tabsStore.load(),
     loadTheme(),
   ])
+
+  // Open workspace (handles collections + environments via new architecture)
+  if (startupResult) {
+    const pathToOpen = startupResult.migration?.workspacePath
+      ?? startupResult.lastOpened?.path
+      ?? startupResult.scratchPadPath
+
+    if (pathToOpen) {
+      try {
+        await workspaceStore.openWorkspace(pathToOpen)
+      } catch (err) {
+        console.error('[App] Failed to open workspace:', err)
+        try {
+          await workspaceStore.openWorkspace(startupResult.scratchPadPath)
+        } catch {
+          // Last resort — app still renders
+        }
+      }
+    }
+
+    await workspaceStore.loadRecentWorkspaces()
+  }
 })
 </script>
 

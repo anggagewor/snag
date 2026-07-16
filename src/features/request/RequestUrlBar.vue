@@ -2,7 +2,7 @@
 import { computed } from 'vue'
 
 import { HttpMethod, ProtocolType } from '@/types/common'
-import { useEnvironmentsStore } from '@/stores/environments'
+import { useWorkspaceStore } from '@/stores/workspace'
 import { useTabsStore } from '@/stores/tabs'
 import type { RequestConfig } from '@/types/request'
 import BaseButton from '@/components/base/BaseButton.vue'
@@ -26,7 +26,7 @@ const emit = defineEmits<{
 
 const tabsStore = useTabsStore()
 
-const environmentsStore = useEnvironmentsStore()
+const workspaceStore = useWorkspaceStore()
 
 const protocolOptions: SelectOption[] = [
   { label: 'REST', value: ProtocolType.REST, color: '#10b981' },
@@ -52,12 +52,12 @@ const currentMethod = computed(() => props.request.method)
 // Resolved URL preview (includes env vars + path params)
 const resolvedUrl = computed(() => {
   if (!props.request.url) return ''
-  let url = environmentsStore.resolveVariablesInString(props.request.url)
+  let url = workspaceStore.resolveVariablesInString(props.request.url)
   // Also resolve path params for preview
   const pathParams = props.request.pathParams || []
   for (const param of pathParams) {
     if (param.value) {
-      const resolvedValue = environmentsStore.resolveVariablesInString(param.value)
+      const resolvedValue = workspaceStore.resolveVariablesInString(param.value)
       url = url.replace(new RegExp(`:${param.key}\\b`, 'g'), resolvedValue)
     }
   }

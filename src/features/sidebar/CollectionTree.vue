@@ -1,31 +1,59 @@
 <script setup lang="ts">
-import { provide, ref } from 'vue'
+import { provide, ref, onMounted } from 'vue'
 
-import { ChevronRight, Folder, MoreVertical, Zap, FolderPlus, Pencil, Copy, Download, Trash2, Variable } from 'lucide-vue-next'
+import { ChevronRight, Folder, MoreVertical, Zap, FolderPlus, Pencil, Trash2, Variable } from 'lucide-vue-next'
 
-import { useCollectionsStore } from '@/stores/collections'
-import type { Collection, CollectionItem } from '@/types/collection'
-import type { UUID } from '@/types/common'
-import { createEmptyRequest } from '@/types/request'
-import { exportToPostman } from '@/utils/export-postman'
+import { useWorkspaceStore } from '@/stores/workspace'
+import { useWorkspaceService } from '@/services/provider'
+import type { Collection, TreeNode } from '@/domain'
+import type { CollectionId, FolderId, RequestId } from '@/domain'
 import BaseDropdown from '@/components/base/BaseDropdown.vue'
 import BaseModal from '@/components/base/BaseModal.vue'
 import CollectionTreeItem from './CollectionTreeItem.vue'
-
 import type { TreeContext } from './collectionTreeContext'
 
-const collectionsStore = useCollectionsStore()
+const workspaceStore = useWorkspaceStore()
 
-const expandedIds = ref<Set<UUID>>(new Set())
-const editingId = ref<UUID | null>(null)
+const expandedIds = ref<Set<string>>(new Set())
+const editingId = ref<string | null>(null)
 const editingName = ref('')
 
+// Cache for request display data (loaded lazily)
+const requestNames = ref<Map<string, string>>(new Map())
+const requestMethods = ref<Map<string, string>>(new Map())
+
 // Drag & drop state
-const draggingId = ref<UUID | null>(null)
-const dragOverId = ref<UUID | null>(null)
+const draggingId = ref<string | null>(null)
+const dragOverId = ref<string | null>(null)
 const dragPosition = ref<'before' | 'after' | 'inside' | null>(null)
 
-function toggleExpand(id: UUID) {
+// Load request names for tree display
+async function loadRequestMeta(nodes: readonly TreeNode[]) {
+  for (const node of nodes) {
+    if (node.type === 'request') {
+      if (!requestNames.value.has(node.requestId)) {
+        try {
+          const req = await workspaceStore.getRequest(node.requestId as RequestId)
+          requestNames.value.set(node.requestId, req.name)
+          requestMethods.value.set(node.requestId, req.method)
+        } catch {
+          requestNames.value.set(node.requestId, 'Unknown Request')
+          requestMethods.value.set(node.requestId, 'GET')
+        }
+      }
+    } else if (node.type === 'folder') {
+      await loadRequestMeta(node.children)
+    }
+  }
+}
+
+onMounted(async () => {
+  for (const col of workspaceStore.collections) {
+    await loadRequestMeta(col.items)
+  }
+})
+
+function toggleExpand(id: string) {
   if (expandedIds.value.has(id)) {
     expandedIds.value.delete(id)
   } else {
@@ -33,29 +61,61 @@ function toggleExpand(id: UUID) {
   }
 }
 
-function isExpanded(id: UUID): boolean {
+function isExpanded(id: string): boolean {
   return expandedIds.value.has(id)
 }
 
-function startRename(id: UUID, currentName: string) {
+function startRename(id: string, currentName: string) {
   editingId.value = id
   editingName.value = currentName
 }
 
-function finishRenameCollection(collectionId: UUID) {
+async function finishRenameCollection(collectionId: string) {
   if (editingId.value && editingName.value.trim()) {
-    collectionsStore.renameCollection(collectionId, editingName.value.trim())
+    await workspaceStore.renameCollection(collectionId as CollectionId, editingName.value.trim())
   }
   editingId.value = null
   editingName.value = ''
 }
 
-function finishRenameItem(collectionId: UUID, itemId: UUID) {
-  if (editingId.value && editingName.value.trim()) {
-    collectionsStore.renameItem(collectionId, itemId, editingName.value.trim())
+async function finishRenameItem(collectionId: string, itemId: string) {
+  if (!editingId.value || !editingName.value.trim()) {
+    editingId.value = null
+    editingName.value = ''
+    return
   }
+
+  // Check if it's a folder rename or request rename
+  const collection = workspaceStore.collections.find(c => c.id === collectionId)
+  if (!collection) return
+
+  const isFolder = findFolderInTree(collection.items, itemId)
+  if (isFolder) {
+    await workspaceStore.renameFolder(collectionId as CollectionId, itemId as FolderId, editingName.value.trim())
+  } else {
+    // It's a request — update the request file name
+    try {
+      const request = await workspaceStore.getRequest(itemId as RequestId)
+      const updated = { ...request, name: editingName.value.trim() }
+      await workspaceStore.saveRequest(updated)
+      requestNames.value.set(itemId, editingName.value.trim())
+    } catch {
+      // Request might not exist
+    }
+  }
+
   editingId.value = null
   editingName.value = ''
+}
+
+function findFolderInTree(nodes: readonly TreeNode[], id: string): boolean {
+  for (const node of nodes) {
+    if (node.type === 'folder') {
+      if (node.id === id) return true
+      if (findFolderInTree(node.children, id)) return true
+    }
+  }
+  return false
 }
 
 function cancelRename() {
@@ -63,75 +123,20 @@ function cancelRename() {
   editingName.value = ''
 }
 
-function deleteCollection(id: UUID) {
-  collectionsStore.deleteCollection(id)
+async function deleteCollection(id: string) {
+  await workspaceStore.deleteCollection(id as CollectionId)
 }
 
-function duplicateCollection(collection: Collection) {
-  const newCol = collectionsStore.createCollection(`${collection.name} (copy)`)
-  const clonedItems: CollectionItem[] = JSON.parse(JSON.stringify(collection.items))
-  function regenIds(items: CollectionItem[]) {
-    for (const item of items) {
-      item.id = crypto.randomUUID()
-      if (item.request) item.request.id = crypto.randomUUID()
-      if (item.items) regenIds(item.items)
-    }
-  }
-  regenIds(clonedItems)
-  for (const item of clonedItems) {
-    collectionsStore.addItem(newCol.id, item)
-  }
-}
-
-function addRequestToCollection(collectionId: UUID) {
-  const item: CollectionItem = {
-    id: crypto.randomUUID(),
-    type: 'request',
-    name: 'New Request',
-    request: createEmptyRequest(),
-  }
-  collectionsStore.addItem(collectionId, item)
+async function addRequestToCollection(collectionId: string) {
+  const request = await workspaceStore.createRequest(collectionId as CollectionId, null)
+  requestNames.value.set(request.id, request.name)
+  requestMethods.value.set(request.id, request.method)
   expandedIds.value.add(collectionId)
 }
 
-function addFolderToCollection(collectionId: UUID) {
-  const folder: CollectionItem = {
-    id: crypto.randomUUID(),
-    type: 'folder',
-    name: 'New Folder',
-    items: [],
-  }
-  collectionsStore.addItem(collectionId, folder)
+async function addFolderToCollection(collectionId: string) {
+  await workspaceStore.addFolder(collectionId as CollectionId, null, 'New Folder')
   expandedIds.value.add(collectionId)
-}
-
-const isTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window
-
-async function exportCollection(collection: Collection) {
-  const postmanJson = exportToPostman(collection)
-  const content = JSON.stringify(postmanJson, null, 2)
-  const fileName = `${collection.name.replace(/[^a-zA-Z0-9-_]/g, '_')}.postman_collection.json`
-
-  if (isTauri) {
-    const { save } = await import('@tauri-apps/plugin-dialog')
-    const { writeTextFile } = await import('@tauri-apps/plugin-fs')
-    const filePath = await save({
-      title: 'Export Collection',
-      defaultPath: fileName,
-      filters: [{ name: 'JSON', extensions: ['json'] }],
-    })
-    if (filePath) {
-      await writeTextFile(filePath, content)
-    }
-  } else {
-    const blob = new Blob([content], { type: 'application/json' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = fileName
-    a.click()
-    URL.revokeObjectURL(url)
-  }
 }
 
 // Provide tree context for recursive children
@@ -139,6 +144,8 @@ const treeContext: TreeContext = {
   expandedIds,
   editingId,
   editingName,
+  requestNames,
+  requestMethods,
   startRename,
   finishRenameItem,
   cancelRename,
@@ -153,32 +160,34 @@ provide('treeContext', treeContext)
 
 // Collection variables editing
 const showVariablesModal = ref(false)
-const editingCollectionId = ref<UUID | null>(null)
-const editingVariables = ref<{ key: string; value: string }[]>([])
+const editingCollectionId = ref<string | null>(null)
+const editingVariables = ref<{ key: string; value: string; enabled: boolean }[]>([])
 
 function openVariablesEditor(collection: Collection) {
   editingCollectionId.value = collection.id
-  editingVariables.value = collection.variables
-    ? JSON.parse(JSON.stringify(collection.variables))
-    : []
+  editingVariables.value = collection.variables.map(v => ({ ...v }))
   showVariablesModal.value = true
 }
 
 function addVariable() {
-  editingVariables.value.push({ key: '', value: '' })
+  editingVariables.value.push({ key: '', value: '', enabled: true })
 }
 
 function removeVariable(index: number) {
   editingVariables.value.splice(index, 1)
 }
 
-function saveVariables() {
+async function saveVariables() {
   if (!editingCollectionId.value) return
-  const collection = collectionsStore.collections.find((c) => c.id === editingCollectionId.value)
+  const collection = workspaceStore.collections.find(c => c.id === editingCollectionId.value)
   if (collection) {
-    collection.variables = editingVariables.value.filter((v) => v.key.trim())
-    collection.updatedAt = new Date().toISOString()
-    collectionsStore.save()
+    const updated: Collection = {
+      ...collection,
+      variables: editingVariables.value.filter(v => v.key.trim()),
+    }
+    const service = useWorkspaceService()
+    await service.saveCollection(updated)
+    await workspaceStore.reloadCollection(updated.id)
   }
   showVariablesModal.value = false
 }
@@ -186,7 +195,7 @@ function saveVariables() {
 
 <template>
   <div class="space-y-0.5" role="tree" aria-label="Collections">
-    <div v-for="collection in collectionsStore.collections" :key="collection.id">
+    <div v-for="collection in workspaceStore.collections" :key="collection.id">
       <!-- Collection header -->
       <div
         class="flex items-center gap-1 px-2 py-1.5 rounded text-sm hover:bg-surface-hover cursor-pointer group"
@@ -240,14 +249,6 @@ function saveVariables() {
                 <Pencil class="w-3.5 h-3.5 text-muted" />
                 Rename
               </button>
-              <button class="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-primary hover:bg-surface-hover text-left" @click="duplicateCollection(collection); close()">
-                <Copy class="w-3.5 h-3.5 text-muted" />
-                Duplicate
-              </button>
-              <button class="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-primary hover:bg-surface-hover text-left" @click="exportCollection(collection); close()">
-                <Download class="w-3.5 h-3.5 text-muted" />
-                Export (Postman)
-              </button>
               <button class="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-primary hover:bg-surface-hover text-left" @click="openVariablesEditor(collection); close()">
                 <Variable class="w-3.5 h-3.5 text-muted" />
                 Variables
@@ -270,7 +271,7 @@ function saveVariables() {
 
         <CollectionTreeItem
           v-for="item in collection.items"
-          :key="item.id"
+          :key="item.type === 'folder' ? item.id : item.requestId"
           :item="item"
           :collection-id="collection.id"
         />

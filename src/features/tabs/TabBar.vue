@@ -4,18 +4,18 @@ import { ref, nextTick } from 'vue'
 import { Settings, Check, Save, Plus, Folder, FlaskConical, PanelLeft } from 'lucide-vue-next'
 
 import { useTabsStore } from '@/stores/tabs'
-import { useCollectionsStore } from '@/stores/collections'
+import { useWorkspaceStore } from '@/stores/workspace'
 import { ProtocolType } from '@/types/common'
 import type { UUID } from '@/types/common'
-import type { CollectionItem } from '@/types/collection'
 import type { Tab } from '@/stores/tabs'
+import type { CollectionId, FolderId, RequestId } from '@/domain'
 import BaseTab from '@/components/base/BaseTab.vue'
 import BaseBadge from '@/components/base/BaseBadge.vue'
 import BaseModal from '@/components/base/BaseModal.vue'
 import EnvironmentSelector from '@/features/environments/EnvironmentSelector.vue'
 
 const tabsStore = useTabsStore()
-const collectionsStore = useCollectionsStore()
+const workspaceStore = useWorkspaceStore()
 
 const emit = defineEmits<{
   toggleSidebar: []
@@ -28,8 +28,8 @@ const renameInputRef = ref<HTMLInputElement | null>(null)
 
 // Save to collection modal
 const showSaveModal = ref(false)
-const saveTargetCollectionId = ref<UUID | null>(null)
-const saveTargetFolderId = ref<UUID | null>(null)
+const saveTargetCollectionId = ref<string | null>(null)
+const saveTargetFolderId = ref<string | null>(null)
 
 function startRename(tabId: UUID, currentTitle: string) {
   renamingTabId.value = tabId
@@ -49,49 +49,144 @@ function cancelRename() {
 }
 
 /**
- * Save tab: if it has a sourceId, save back to collection directly.
+ * Save tab: if it has a sourceId, save back to workspace request file.
  * Otherwise, open the "Save to Collection" modal.
  */
-function handleSave(tab: Tab) {
+async function handleSave(tab: Tab) {
   if (tab.sourceId) {
-    tabsStore.saveTab(tab.id)
+    await saveTabToWorkspace(tab)
   } else {
     openSaveModal()
   }
 }
 
+async function saveTabToWorkspace(tab: Tab) {
+  if (!tab.request || !tab.sourceId) return
+
+  const [_collectionId, requestId] = tab.sourceId.split(':')
+  if (!requestId) return
+
+  try {
+    const existing = await workspaceStore.getRequest(requestId as RequestId)
+    const updated = {
+      ...existing,
+      name: tab.title,
+      method: tab.request.method as any,
+      url: tab.request.url,
+      headers: tab.request.headers.map(h => ({
+        key: h.key,
+        value: h.value,
+        enabled: h.enabled,
+        description: undefined,
+      })),
+      params: tab.request.params.map(p => ({
+        key: p.key,
+        value: p.value,
+        enabled: p.enabled,
+        description: undefined,
+      })),
+      body: mapTabBodyToDomain(tab.request.body),
+      auth: mapTabAuthToDomain(tab.request.auth),
+      preRequest: tab.request.preRequestScript ?? '',
+      tests: tab.request.testScript ?? '',
+    }
+    await workspaceStore.saveRequest(updated)
+    tabsStore.markTabClean(tab.id)
+  } catch (err) {
+    console.error('[TabBar] Failed to save request:', err)
+  }
+}
+
+function mapTabBodyToDomain(body: any): any {
+  const typeMap: Record<string, string> = {
+    none: 'none',
+    json: 'json',
+    raw: 'text',
+    'form-data': 'formdata',
+    'x-www-form-urlencoded': 'urlencoded',
+    binary: 'binary',
+  }
+  return {
+    type: typeMap[body?.type] ?? 'none',
+    content: body?.raw ?? '',
+    formData: body?.formData?.map((f: any) => ({
+      key: f.key,
+      value: f.value,
+      enabled: f.enabled,
+    })),
+    binaryPath: body?.binary,
+  }
+}
+
+function mapTabAuthToDomain(auth: any): any {
+  const typeMap: Record<string, string> = {
+    none: 'none',
+    basic: 'basic',
+    bearer: 'bearer',
+    'api-key': 'apikey',
+  }
+  return {
+    type: typeMap[auth?.type] ?? 'none',
+    basic: auth?.basic,
+    bearer: auth?.bearer,
+    apiKey: auth?.apiKey ? {
+      key: auth.apiKey.key,
+      value: auth.apiKey.value,
+      in: auth.apiKey.addTo === 'query' ? 'query' : 'header',
+    } : undefined,
+  }
+}
+
 function openSaveModal() {
   showSaveModal.value = true
-  saveTargetCollectionId.value = collectionsStore.collections[0]?.id || null
+  saveTargetCollectionId.value = workspaceStore.collections[0]?.id || null
   saveTargetFolderId.value = null
 }
 
-function saveToCollection() {
+async function saveToCollection() {
   const tab = tabsStore.activeTab
   if (!tab || tab.type !== 'request' || !tab.request || !saveTargetCollectionId.value) return
 
-  const itemId = crypto.randomUUID()
-  const item: CollectionItem = {
-    id: itemId,
-    type: 'request',
-    name: tab.title,
-    request: JSON.parse(JSON.stringify(tab.request)),
-  }
-  collectionsStore.addItem(saveTargetCollectionId.value, item, saveTargetFolderId.value || undefined)
+  const request = await workspaceStore.createRequest(
+    saveTargetCollectionId.value as CollectionId,
+    saveTargetFolderId.value as FolderId | null,
+    { name: tab.title, method: tab.request.method as any },
+  )
 
-  // Link this tab to the new collection item via store action
-  tabsStore.linkTabToSource(tab.id, `${saveTargetCollectionId.value}:${itemId}`)
+  // Now save the full request data
+  const updated = {
+    ...request,
+    url: tab.request.url,
+    headers: tab.request.headers.map(h => ({
+      key: h.key,
+      value: h.value,
+      enabled: h.enabled,
+      description: undefined,
+    })),
+    params: tab.request.params.map(p => ({
+      key: p.key,
+      value: p.value,
+      enabled: p.enabled,
+      description: undefined,
+    })),
+    body: mapTabBodyToDomain(tab.request.body),
+    auth: mapTabAuthToDomain(tab.request.auth),
+    preRequest: tab.request.preRequestScript ?? '',
+    tests: tab.request.testScript ?? '',
+  }
+  await workspaceStore.saveRequest(updated)
+
+  // Link tab to the new request
+  tabsStore.linkTabToSource(tab.id, `${saveTargetCollectionId.value}:${request.id}`)
   showSaveModal.value = false
 }
 
-function handleSaveAndClose() {
+async function handleSaveAndClose() {
   const tabId = tabsStore.pendingCloseTabId
   if (!tabId) return
   const tab = tabsStore.tabs.find((t) => t.id === tabId)
   if (tab && tab.type === 'request' && tab.isDirty) {
-    if (tab.sourceId) {
-      tabsStore.saveTab(tabId)
-    }
+    await saveTabToWorkspace(tab)
   }
   tabsStore.forceCloseTab(tabId)
 }
@@ -174,7 +269,7 @@ function handleSaveAndClose() {
       </BaseTab>
     </div>
 
-    <!-- New tab button (always visible, outside scroll area) -->
+    <!-- New tab button -->
     <button
       class="p-1.5 mx-0.5 text-muted hover:text-primary hover:bg-surface-hover rounded transition-colors flex-shrink-0"
       title="New Request (Cmd+T)"
@@ -231,11 +326,11 @@ function handleSaveAndClose() {
   <!-- Save to Collection Modal -->
   <BaseModal :open="showSaveModal" title="Save to Collection" @close="showSaveModal = false">
     <div class="space-y-3">
-      <div v-if="collectionsStore.collections.length === 0" class="text-sm text-muted text-center py-4">
+      <div v-if="workspaceStore.collections.length === 0" class="text-sm text-muted text-center py-4">
         <p>No collections yet.</p>
         <button
           class="mt-2 px-3 py-1.5 text-xs rounded-md bg-accent text-white hover:bg-accent-hover"
-          @click="collectionsStore.createCollection('My Collection'); saveTargetCollectionId = collectionsStore.collections[0]?.id"
+          @click="workspaceStore.createCollection('My Collection').then(() => { saveTargetCollectionId = workspaceStore.collections[0]?.id })"
         >
           Create Collection
         </button>
@@ -245,7 +340,7 @@ function handleSaveAndClose() {
         <label class="block text-xs text-secondary">Collection</label>
         <div class="space-y-1 max-h-[160px] overflow-y-auto">
           <button
-            v-for="col in collectionsStore.collections"
+            v-for="col in workspaceStore.collections"
             :key="col.id"
             class="w-full flex items-center gap-2 px-3 py-2 rounded text-sm text-left transition-colors"
             :class="saveTargetCollectionId === col.id ? 'bg-accent/10 text-accent border border-accent/30' : 'hover:bg-surface-hover text-primary border border-transparent'"
@@ -259,7 +354,7 @@ function handleSaveAndClose() {
 
         <!-- Folder selection (if collection has folders) -->
         <template v-if="saveTargetCollectionId">
-          <template v-for="col in collectionsStore.collections" :key="'folder-' + col.id">
+          <template v-for="col in workspaceStore.collections" :key="'folder-' + col.id">
             <template v-if="col.id === saveTargetCollectionId && col.items.filter(i => i.type === 'folder').length > 0">
               <label class="block text-xs text-secondary mt-3">Folder (optional)</label>
               <div class="space-y-1 max-h-[120px] overflow-y-auto">
@@ -273,13 +368,13 @@ function handleSaveAndClose() {
                 </button>
                 <button
                   v-for="folder in col.items.filter(i => i.type === 'folder')"
-                  :key="folder.id"
+                  :key="folder.type === 'folder' ? folder.id : ''"
                   class="w-full flex items-center gap-2 px-3 py-1.5 rounded text-xs text-left transition-colors"
-                  :class="saveTargetFolderId === folder.id ? 'bg-accent/10 text-accent border border-accent/30' : 'hover:bg-surface-hover text-primary border border-transparent'"
-                  @click="saveTargetFolderId = folder.id"
+                  :class="saveTargetFolderId === (folder.type === 'folder' ? folder.id : '') ? 'bg-accent/10 text-accent border border-accent/30' : 'hover:bg-surface-hover text-primary border border-transparent'"
+                  @click="saveTargetFolderId = folder.type === 'folder' ? folder.id : null"
                 >
                   <Folder class="w-3.5 h-3.5 text-muted flex-shrink-0" />
-                  <span>{{ folder.name }}</span>
+                  <span>{{ folder.type === 'folder' ? folder.name : '' }}</span>
                 </button>
               </div>
             </template>

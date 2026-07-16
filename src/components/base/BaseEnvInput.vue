@@ -3,7 +3,7 @@ import { ref, computed, watch, nextTick, onMounted, onBeforeUnmount } from 'vue'
 
 import { Plus, Pencil } from 'lucide-vue-next'
 
-import { useEnvironmentsStore } from '@/stores/environments'
+import { useWorkspaceStore } from '@/stores/workspace'
 import BaseModal from '@/components/base/BaseModal.vue'
 
 const props = defineProps<{
@@ -18,7 +18,7 @@ const emit = defineEmits<{
   'update:modelValue': [value: string]
 }>()
 
-const environmentsStore = useEnvironmentsStore()
+const workspaceStore = useWorkspaceStore()
 const inputRef = ref<HTMLInputElement | null>(null)
 const containerRef = ref<HTMLElement | null>(null)
 
@@ -50,7 +50,7 @@ const variableContext = computed(() => {
 
 const suggestions = computed(() => {
   if (!variableContext.value) return []
-  const allVars = Object.keys(environmentsStore.resolvedVariables)
+  const allVars = Object.keys(workspaceStore.resolvedVariables)
   const q = variableContext.value.query.toLowerCase()
   if (!q) return allVars
   return allVars.filter((v) => v.toLowerCase().includes(q))
@@ -60,7 +60,7 @@ const canCreateNew = computed(() => {
   if (!variableContext.value) return false
   const q = variableContext.value.query
   if (!q) return false
-  return !Object.keys(environmentsStore.resolvedVariables).includes(q)
+  return !Object.keys(workspaceStore.resolvedVariables).includes(q)
 })
 
 watch(variableContext, () => {
@@ -130,7 +130,7 @@ function selectSuggestion(varName: string) {
 function openEditModal(varName: string) {
   modalMode.value = 'edit'
   modalVarName.value = varName
-  modalVarValue.value = environmentsStore.resolvedVariables[varName] || ''
+  modalVarValue.value = workspaceStore.resolvedVariables[varName] || ''
   isOpen.value = false
   showModal.value = true
   nextTick(() => modalValueInputRef.value?.focus())
@@ -151,27 +151,27 @@ function openCreateModal() {
   })
 }
 
-function saveModal() {
+async function saveModal() {
   if (!modalVarName.value.trim()) return
 
   if (modalMode.value === 'edit') {
-    const env = environmentsStore.activeEnvironment
+    const env = workspaceStore.activeEnvironment
     if (!env) return
     const vars = [...env.variables]
     const idx = vars.findIndex((v) => v.key === modalVarName.value)
     if (idx !== -1) {
       vars[idx] = { ...vars[idx], value: modalVarValue.value }
     }
-    environmentsStore.updateEnvironment(env.id, { variables: vars })
+    workspaceStore.saveEnvironment({ ...env, variables: vars })
   } else {
-    let env = environmentsStore.activeEnvironment
+    let env = workspaceStore.activeEnvironment
     if (!env) {
-      const created = environmentsStore.createEnvironment('Default')
-      environmentsStore.setActive(created.id)
+      const created = await workspaceStore.createEnvironment('Default')
+      await workspaceStore.setActiveEnvironment(created.id)
       env = created
     }
     const vars = [...env.variables, { key: modalVarName.value.trim(), value: modalVarValue.value, enabled: true }]
-    environmentsStore.updateEnvironment(env.id, { variables: vars })
+    workspaceStore.saveEnvironment({ ...env, variables: vars })
     selectSuggestion(modalVarName.value.trim())
   }
 
@@ -236,8 +236,8 @@ defineExpose({ inputRef })
       >
         <div class="px-2.5 py-1 text-[10px] text-muted uppercase tracking-wider border-b border-border">
           Variables
-          <span v-if="environmentsStore.activeEnvironment" class="normal-case tracking-normal">
-            · {{ environmentsStore.activeEnvironment.name }}
+          <span v-if="workspaceStore.activeEnvironment" class="normal-case tracking-normal">
+            · {{ workspaceStore.activeEnvironment.name }}
           </span>
         </div>
 
@@ -256,7 +256,7 @@ defineExpose({ inputRef })
             >
               <span class="font-mono text-primary truncate">{{ varName }}</span>
               <span class="text-[10px] text-muted font-mono truncate ml-2 max-w-[140px]">
-                {{ environmentsStore.resolvedVariables[varName] }}
+                {{ workspaceStore.resolvedVariables[varName] }}
               </span>
             </button>
             <button
@@ -311,7 +311,7 @@ defineExpose({ inputRef })
             @keydown.enter="saveModal"
           />
         </div>
-        <p v-if="!environmentsStore.activeEnvironment && modalMode === 'create'" class="text-xs text-warning">
+        <p v-if="!workspaceStore.activeEnvironment && modalMode === 'create'" class="text-xs text-warning">
           No active environment — a "Default" one will be created
         </p>
       </div>

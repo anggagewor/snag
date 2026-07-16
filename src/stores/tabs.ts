@@ -1,12 +1,11 @@
 import { defineStore } from 'pinia'
 import { ref, computed, watch } from 'vue'
 
-import { useCollectionsStore } from '@/stores/collections'
+import { useWorkspaceStore } from '@/stores/workspace'
 import { useStorage } from '@/composables/useStorage'
 import { debounce } from '@/utils/debounce'
 import type { UUID } from '@/types/common'
 import { ProtocolType } from '@/types/common'
-import type { CollectionItem } from '@/types/collection'
 import type { RequestConfig, ResponseData } from '@/types/request'
 import type { WebSocketConfig, WebSocketSession } from '@/types/websocket'
 import type { GraphQLConfig, GraphQLResponseData } from '@/types/graphql'
@@ -99,10 +98,10 @@ export const useTabsStore = defineStore('tabs', () => {
     let collectionVariables: { key: string; value: string }[] | undefined
     if (sourceId) {
       const [collectionId] = sourceId.split(':')
-      const collectionsStore = useCollectionsStore()
-      const collection = collectionsStore.collections.find((c) => c.id === collectionId)
+      const workspaceStore = useWorkspaceStore()
+      const collection = workspaceStore.collections.find((c) => c.id === collectionId)
       if (collection?.variables && collection.variables.length > 0) {
-        collectionVariables = [...collection.variables]
+        collectionVariables = collection.variables.map(v => ({ key: v.key, value: v.value }))
       }
     }
 
@@ -237,43 +236,15 @@ export const useTabsStore = defineStore('tabs', () => {
   }
 
   /**
-   * Save current tab back to its source collection item.
-   * Also syncs title.
+   * Save current tab back to its source.
+   * NOTE: Actual persistence is handled by TabBar via workspaceStore.
+   * This function now only marks the tab as clean for backward compat.
    */
   function saveTab(id: UUID) {
     const tab = tabs.value.find((t) => t.id === id)
     if (!tab || !tab.request || !tab.sourceId) return false
-
-    const [collectionId, itemId] = tab.sourceId.split(':')
-    if (!collectionId || !itemId) return false
-
-    const collectionsStore = useCollectionsStore()
-    const collection = collectionsStore.collections.find((c) => c.id === collectionId)
-    if (!collection) return false
-
-    // Find and update the item in collection
-    function updateItem(items: CollectionItem[]): boolean {
-      for (let i = 0; i < items.length; i++) {
-        if (items[i].id === itemId) {
-          items[i].name = tab!.title
-          items[i].request = JSON.parse(JSON.stringify(tab!.request))
-          return true
-        }
-        if (items[i].items && updateItem(items[i].items!)) {
-          return true
-        }
-      }
-      return false
-    }
-
-    const updated = updateItem(collection.items)
-    if (updated) {
-      collection.updatedAt = new Date().toISOString()
-      collectionsStore.save()
-      tab.isDirty = false
-      return true
-    }
-    return false
+    tab.isDirty = false
+    return true
   }
 
   return {

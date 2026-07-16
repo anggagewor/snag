@@ -1,25 +1,26 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 
-import { useEnvironmentsStore } from '@/stores/environments'
+import { useWorkspaceStore } from '@/stores/workspace'
+import type { EnvironmentId } from '@/domain'
 import BaseSelect from '@/components/base/BaseSelect.vue'
 import type { SelectOption } from '@/components/base/BaseSelect.vue'
 
-const environmentsStore = useEnvironmentsStore()
+const workspaceStore = useWorkspaceStore()
 
 const options = computed<SelectOption[]>(() => [
   { label: 'No Environment', value: '__none__' },
-  ...environmentsStore.environments.map((env) => ({
+  ...workspaceStore.environments.map((env) => ({
     label: env.name,
     value: env.id,
-    color: '#10b981', // green dot for all envs
+    color: '#10b981',
   })),
 ])
 
-const selectedValue = computed(() => environmentsStore.activeEnvironmentId || '__none__')
+const selectedValue = computed(() => workspaceStore.activeEnvironmentId || '__none__')
 
 function onSelect(value: string) {
-  environmentsStore.setActive(value === '__none__' ? null : value)
+  workspaceStore.setActiveEnvironment(value === '__none__' ? null : value as EnvironmentId)
 }
 </script>
 

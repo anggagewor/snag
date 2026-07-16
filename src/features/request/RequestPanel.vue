@@ -3,7 +3,7 @@ import { ref, computed } from 'vue'
 
 import { useTabsStore } from '@/stores/tabs'
 import { useHistoryStore } from '@/stores/history'
-import { useEnvironmentsStore } from '@/stores/environments'
+import { useWorkspaceStore } from '@/stores/workspace'
 import { useHttp } from '@/composables/useHttp'
 import { useScriptRunner } from '@/composables/useScriptRunner'
 import { HttpMethod, ProtocolType } from '@/types/common'
@@ -24,7 +24,7 @@ const props = defineProps<{
 
 const tabsStore = useTabsStore()
 const historyStore = useHistoryStore()
-const environmentsStore = useEnvironmentsStore()
+const workspaceStore = useWorkspaceStore()
 const { isLoading, error, sendRequest, cancelRequest } = useHttp()
 const { runPreRequestScript, runTestScript } = useScriptRunner()
 
@@ -57,7 +57,7 @@ async function handleSend() {
   testResults.value = []
 
   const collectionVars = props.tab.collectionVariables
-  const envVars = { ...environmentsStore.resolvedVariables }
+  const envVars = { ...workspaceStore.resolvedVariables }
 
   // Run pre-request script
   if (request.value.preRequestScript) {

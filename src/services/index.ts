@@ -46,3 +46,7 @@ export {
   useSettingsService,
   useStorageAdapter,
 } from './provider'
+
+export { detectV0Data, migrateV0ToV1, type MigrationResult } from './migration'
+export { ensureScratchPad, getScratchPadPath } from './scratch'
+export { startApp, type StartupResult } from './startup'

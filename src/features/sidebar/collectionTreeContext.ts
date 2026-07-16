@@ -1,18 +1,21 @@
 import type { Ref } from 'vue'
-import type { UUID } from '@/types/common'
 
 export interface DragState {
-  draggingId: Ref<UUID | null>
-  dragOverId: Ref<UUID | null>
+  draggingId: Ref<string | null>
+  dragOverId: Ref<string | null>
   dragPosition: Ref<'before' | 'after' | 'inside' | null>
 }
 
 export interface TreeContext {
-  expandedIds: Ref<Set<UUID>>
-  editingId: Ref<UUID | null>
+  expandedIds: Ref<Set<string>>
+  editingId: Ref<string | null>
   editingName: Ref<string>
-  startRename: (id: UUID, name: string) => void
-  finishRenameItem: (collectionId: UUID, itemId: UUID) => void
+  /** Cached request names for display in tree (requestId → name) */
+  requestNames: Ref<Map<string, string>>
+  /** Cached request methods for badge display (requestId → method) */
+  requestMethods: Ref<Map<string, string>>
+  startRename: (id: string, name: string) => void
+  finishRenameItem: (collectionId: string, itemId: string) => void
   cancelRename: () => void
   drag: DragState
 }

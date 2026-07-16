@@ -1,6 +1,6 @@
 import { ref } from 'vue'
 
-import { useEnvironmentsStore } from '@/stores/environments'
+import { useWorkspaceStore } from '@/stores/workspace'
 import { useSettingsStore } from '@/stores/settings'
 import type { RequestConfig, ResponseData } from '@/types/request'
 import type { KeyValuePair } from '@/types/common'
@@ -22,8 +22,8 @@ export function useHttp() {
   let abortController: AbortController | null = null
 
   function resolve(str: string, collectionVariables?: { key: string; value: string }[]): string {
-    const envStore = useEnvironmentsStore()
-    return envStore.resolveVariablesInString(str, collectionVariables)
+    const workspaceStore = useWorkspaceStore()
+    return workspaceStore.resolveVariablesInString(str, collectionVariables)
   }
 
   function buildUrl(url: string, params: KeyValuePair[], collectionVariables?: { key: string; value: string }[]): string {

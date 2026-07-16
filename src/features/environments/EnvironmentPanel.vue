@@ -3,55 +3,58 @@ import { ref, computed } from 'vue'
 
 import { Plus, X, Check, Pencil, Trash2, FlaskConical, Download } from 'lucide-vue-next'
 
-import { useEnvironmentsStore } from '@/stores/environments'
+import { useWorkspaceStore } from '@/stores/workspace'
+import type { Environment, EnvironmentVariable, EnvironmentId } from '@/domain'
 import { exportToPostmanEnvironment } from '@/utils/export-environment'
-import type { EnvironmentVariable } from '@/types/environment'
-import type { UUID } from '@/types/common'
 import BaseButton from '@/components/base/BaseButton.vue'
 import BaseBadge from '@/components/base/BaseBadge.vue'
 
-const environmentsStore = useEnvironmentsStore()
+const workspaceStore = useWorkspaceStore()
 
-const selectedEnvId = ref<UUID | null>(null)
-const editingNameId = ref<UUID | null>(null)
+const selectedEnvId = ref<string | null>(null)
+const editingNameId = ref<string | null>(null)
 const editingName = ref('')
 const syntaxHint = '{{variable}}'
 
 const selectedEnv = computed(() =>
-  environmentsStore.environments.find((e) => e.id === selectedEnvId.value) || null
+  workspaceStore.environments.find((e) => e.id === selectedEnvId.value) || null
 )
 
-function selectEnv(id: UUID) {
+function selectEnv(id: string) {
   selectedEnvId.value = id
 }
 
-function createEnv() {
-  const env = environmentsStore.createEnvironment('New Environment')
+async function createEnv() {
+  const env = await workspaceStore.createEnvironment('New Environment')
   selectedEnvId.value = env.id
   startRename(env.id, env.name)
 }
 
-function deleteEnv(id: UUID) {
-  environmentsStore.deleteEnvironment(id)
+async function deleteEnv(id: string) {
+  await workspaceStore.deleteEnvironment(id as EnvironmentId)
   if (selectedEnvId.value === id) {
-    selectedEnvId.value = environmentsStore.environments[0]?.id || null
+    selectedEnvId.value = workspaceStore.environments[0]?.id || null
   }
 }
 
-function startRename(id: UUID, name: string) {
+function startRename(id: string, name: string) {
   editingNameId.value = id
   editingName.value = name
 }
 
-function finishRename() {
+async function finishRename() {
   if (editingNameId.value && editingName.value.trim()) {
-    environmentsStore.updateEnvironment(editingNameId.value, { name: editingName.value.trim() })
+    const env = workspaceStore.environments.find(e => e.id === editingNameId.value)
+    if (env) {
+      const updated: Environment = { ...env, name: editingName.value.trim() }
+      await workspaceStore.saveEnvironment(updated)
+    }
   }
   editingNameId.value = null
 }
 
-function setActive(id: UUID | null) {
-  environmentsStore.setActive(id)
+function setActive(id: string | null) {
+  workspaceStore.setActiveEnvironment(id as EnvironmentId | null)
 }
 
 // Variable management
@@ -60,22 +63,17 @@ function getVariables(): EnvironmentVariable[] {
   if (vars.length === 0 || (vars[vars.length - 1].key !== '')) {
     return [...vars, { key: '', value: '', enabled: true }]
   }
-  return vars
+  return [...vars]
 }
 
-function updateVariable(index: number, field: 'key' | 'value', value: string) {
+async function updateVariable(index: number, field: 'key' | 'value', value: string) {
   if (!selectedEnv.value) return
-  const vars = [...(selectedEnv.value.variables || [])]
+  const vars = [...selectedEnv.value.variables]
 
   if (index >= vars.length) {
     vars.push({ key: '', value: '', enabled: true })
   }
   vars[index] = { ...vars[index], [field]: value }
-
-  // Auto-add row
-  if (index === vars.length - 1 && (vars[index].key !== '' || vars[index].value !== '')) {
-    vars.push({ key: '', value: '', enabled: true })
-  }
 
   // Clean trailing empty rows (keep one)
   const cleaned = vars.filter((v, i) => {
@@ -83,29 +81,40 @@ function updateVariable(index: number, field: 'key' | 'value', value: string) {
     return v.key !== '' || v.value !== ''
   })
 
-  environmentsStore.updateEnvironment(selectedEnv.value.id, { variables: cleaned })
+  const updated: Environment = { ...selectedEnv.value, variables: cleaned }
+  await workspaceStore.saveEnvironment(updated)
 }
 
-function toggleVariable(index: number) {
+async function toggleVariable(index: number) {
   if (!selectedEnv.value) return
   const vars = [...selectedEnv.value.variables]
   vars[index] = { ...vars[index], enabled: !vars[index].enabled }
-  environmentsStore.updateEnvironment(selectedEnv.value.id, { variables: vars })
+  const updated: Environment = { ...selectedEnv.value, variables: vars }
+  await workspaceStore.saveEnvironment(updated)
 }
 
-function removeVariable(index: number) {
+async function removeVariable(index: number) {
   if (!selectedEnv.value) return
   const vars = selectedEnv.value.variables.filter((_, i) => i !== index)
-  environmentsStore.updateEnvironment(selectedEnv.value.id, { variables: vars })
+  const updated: Environment = { ...selectedEnv.value, variables: vars }
+  await workspaceStore.saveEnvironment(updated)
 }
 
 const isTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window
 
-async function exportEnv(id: UUID) {
-  const env = environmentsStore.environments.find((e) => e.id === id)
+async function exportEnv(id: string) {
+  const env = workspaceStore.environments.find((e) => e.id === id)
   if (!env) return
 
-  const postmanJson = exportToPostmanEnvironment(env)
+  // Adapt to old export format
+  const adapted = {
+    id: env.id,
+    name: env.name,
+    variables: env.variables.map(v => ({ ...v })),
+    createdAt: '',
+    updatedAt: '',
+  }
+  const postmanJson = exportToPostmanEnvironment(adapted as any)
   const content = JSON.stringify(postmanJson, null, 2)
   const fileName = `${env.name.replace(/[^a-zA-Z0-9-_]/g, '_')}.postman_environment.json`
 
@@ -145,19 +154,17 @@ async function exportEnv(id: UUID) {
 
       <div class="flex-1 overflow-y-auto p-1.5 space-y-0.5">
         <div
-          v-for="env in environmentsStore.environments"
+          v-for="env in workspaceStore.environments"
           :key="env.id"
           class="flex items-center gap-1.5 px-2 py-1.5 rounded text-xs cursor-pointer group"
           :class="selectedEnvId === env.id ? 'bg-accent/10 text-accent' : 'text-primary hover:bg-surface-hover'"
           @click="selectEnv(env.id)"
         >
-          <!-- Active indicator -->
           <span
             class="w-2 h-2 rounded-full flex-shrink-0"
-            :class="environmentsStore.activeEnvironmentId === env.id ? 'bg-success' : 'bg-border'"
+            :class="workspaceStore.activeEnvironmentId === env.id ? 'bg-success' : 'bg-border'"
           />
 
-          <!-- Name -->
           <input
             v-if="editingNameId === env.id"
             v-model="editingName"
@@ -169,12 +176,11 @@ async function exportEnv(id: UUID) {
           />
           <span v-else class="flex-1 truncate">{{ env.name }}</span>
 
-          <!-- Actions -->
           <div class="flex gap-0.5 opacity-0 group-hover:opacity-100" @click.stop>
             <button
               class="p-0.5 text-muted hover:text-success rounded"
               title="Set as active"
-              @click="setActive(environmentsStore.activeEnvironmentId === env.id ? null : env.id)"
+              @click="setActive(workspaceStore.activeEnvironmentId === env.id ? null : env.id)"
             >
               <Check class="w-3 h-3" />
             </button>
@@ -202,7 +208,7 @@ async function exportEnv(id: UUID) {
           </div>
         </div>
 
-        <div v-if="environmentsStore.environments.length === 0" class="text-center py-6">
+        <div v-if="workspaceStore.environments.length === 0" class="text-center py-6">
           <p class="text-xs text-muted">No environments</p>
         </div>
       </div>
@@ -219,7 +225,6 @@ async function exportEnv(id: UUID) {
       </div>
 
       <template v-else>
-        <!-- Env header -->
         <div class="flex items-center justify-between px-4 py-2 border-b border-border">
           <div>
             <h3 class="text-sm font-medium text-primary">{{ selectedEnv.name }}</h3>
@@ -237,7 +242,7 @@ async function exportEnv(id: UUID) {
               Export
             </button>
             <BaseBadge
-              v-if="environmentsStore.activeEnvironmentId === selectedEnv.id"
+              v-if="workspaceStore.activeEnvironmentId === selectedEnv.id"
               variant="success"
             >
               Active
@@ -247,7 +252,6 @@ async function exportEnv(id: UUID) {
 
         <!-- Variables table -->
         <div class="flex-1 overflow-auto">
-          <!-- Header -->
           <div class="grid grid-cols-[32px_1fr_1fr_32px] gap-0 text-xs text-muted border-b border-border sticky top-0 bg-surface">
             <span class="px-1 py-1.5"></span>
             <span class="px-2 py-1.5 border-l border-border">Variable</span>
@@ -255,7 +259,6 @@ async function exportEnv(id: UUID) {
             <span class="px-1 py-1.5 border-l border-border"></span>
           </div>
 
-          <!-- Rows -->
           <div
             v-for="(variable, index) in getVariables()"
             :key="index"

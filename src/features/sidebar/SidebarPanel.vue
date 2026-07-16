@@ -1,21 +1,18 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 
-import { Folder, Clock, FlaskConical, Plus, Zap, FileText, FolderPlus, Upload } from 'lucide-vue-next'
+import { Folder, Clock, FlaskConical, Plus, Zap, FolderPlus, Upload } from 'lucide-vue-next'
 
-import { useCollectionsStore } from '@/stores/collections'
+import { useWorkspaceStore } from '@/stores/workspace'
 import { useTabsStore } from '@/stores/tabs'
-import { useEnvironmentsStore } from '@/stores/environments'
-import type { CollectionItem } from '@/types/collection'
-import { createEmptyRequest } from '@/types/request'
+import type { CollectionId } from '@/domain'
 import BaseDropdown from '@/components/base/BaseDropdown.vue'
 import CollectionTree from './CollectionTree.vue'
 import ImportModal from './ImportModal.vue'
 import HistoryPanel from '@/features/history/HistoryPanel.vue'
 
-const collectionsStore = useCollectionsStore()
+const workspaceStore = useWorkspaceStore()
 const tabsStore = useTabsStore()
-const environmentsStore = useEnvironmentsStore()
 
 const activeSection = ref<'collections' | 'history' | 'envs'>('collections')
 const showImportModal = ref(false)
@@ -24,37 +21,24 @@ function handleNewRequest() {
   tabsStore.openRequestTab()
 }
 
-function handleNewCollection() {
-  collectionsStore.createCollection('New Collection')
+async function handleNewCollection() {
+  await workspaceStore.createCollection('New Collection')
 }
 
-function handleNewRequestInCollection() {
-  // Create request in first collection, or create collection if none
-  if (collectionsStore.collections.length === 0) {
-    collectionsStore.createCollection('New Collection')
+async function handleNewRequestInCollection() {
+  if (workspaceStore.collections.length === 0) {
+    await workspaceStore.createCollection('New Collection')
   }
-  const col = collectionsStore.collections[0]
-  const item: CollectionItem = {
-    id: crypto.randomUUID(),
-    type: 'request',
-    name: 'New Request',
-    request: createEmptyRequest(),
-  }
-  collectionsStore.addItem(col.id, item)
+  const col = workspaceStore.collections[0]
+  await workspaceStore.createRequest(col.id as CollectionId, null)
 }
 
-function handleNewFolderInCollection() {
-  if (collectionsStore.collections.length === 0) {
-    collectionsStore.createCollection('New Collection')
+async function handleNewFolderInCollection() {
+  if (workspaceStore.collections.length === 0) {
+    await workspaceStore.createCollection('New Collection')
   }
-  const col = collectionsStore.collections[0]
-  const item: CollectionItem = {
-    id: crypto.randomUUID(),
-    type: 'folder',
-    name: 'New Folder',
-    items: [],
-  }
-  collectionsStore.addItem(col.id, item)
+  const col = workspaceStore.collections[0]
+  await workspaceStore.addFolder(col.id as CollectionId, null, 'New Folder')
 }
 </script>
 
@@ -88,7 +72,7 @@ function handleNewFolderInCollection() {
         >
           <FlaskConical class="w-4 h-4" />
           <span
-            v-if="environmentsStore.activeEnvironmentId"
+            v-if="workspaceStore.activeEnvironmentId"
             class="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-success"
           />
         </button>
@@ -96,7 +80,6 @@ function handleNewFolderInCollection() {
 
       <!-- Actions -->
       <div v-if="activeSection === 'collections'" class="flex items-center gap-0.5">
-        <!-- Add dropdown -->
         <BaseDropdown align="right">
           <template #trigger>
             <button class="p-1.5 text-muted hover:text-primary hover:bg-surface-hover rounded transition-colors">
@@ -115,7 +98,7 @@ function handleNewFolderInCollection() {
               class="w-full flex items-center gap-2 px-3 py-2 text-xs text-primary hover:bg-surface-hover text-left"
               @click="handleNewRequestInCollection(); close()"
             >
-              <FileText class="w-3.5 h-3.5 text-muted" />
+              <Zap class="w-3.5 h-3.5 text-muted" />
               New Request in Collection
             </button>
             <button
@@ -149,7 +132,7 @@ function handleNewFolderInCollection() {
     <div class="flex-1 overflow-y-auto">
       <!-- Collections -->
       <div v-if="activeSection === 'collections'" class="p-2">
-        <div v-if="collectionsStore.collections.length === 0" class="text-center py-8">
+        <div v-if="workspaceStore.collections.length === 0" class="text-center py-8">
           <Folder class="w-10 h-10 mx-auto text-muted/30 mb-2" :stroke-width="1.5" />
           <p class="text-xs text-muted">No collections yet</p>
           <p class="text-[10px] text-muted mt-0.5">Create one to organize your requests</p>
@@ -163,24 +146,23 @@ function handleNewFolderInCollection() {
       <!-- Environments quick view -->
       <div v-else-if="activeSection === 'envs'" class="p-2">
         <div class="space-y-2">
-          <!-- List all environments -->
           <div class="space-y-0.5">
             <div
-              v-for="env in environmentsStore.environments"
+              v-for="env in workspaceStore.environments"
               :key="env.id"
               class="flex items-center gap-1.5 px-2 py-1.5 rounded text-xs cursor-pointer hover:bg-surface-hover"
-              :class="environmentsStore.activeEnvironmentId === env.id ? 'text-accent' : 'text-primary'"
-              @click="environmentsStore.setActive(environmentsStore.activeEnvironmentId === env.id ? null : env.id)"
+              :class="workspaceStore.activeEnvironmentId === env.id ? 'text-accent' : 'text-primary'"
+              @click="workspaceStore.setActiveEnvironment(workspaceStore.activeEnvironmentId === env.id ? null : env.id)"
             >
               <span
                 class="w-2 h-2 rounded-full flex-shrink-0"
-                :class="environmentsStore.activeEnvironmentId === env.id ? 'bg-success' : 'bg-border'"
+                :class="workspaceStore.activeEnvironmentId === env.id ? 'bg-success' : 'bg-border'"
               />
               <span class="truncate">{{ env.name }}</span>
             </div>
           </div>
 
-          <div v-if="environmentsStore.environments.length === 0" class="px-2 py-2 text-xs text-muted">
+          <div v-if="workspaceStore.environments.length === 0" class="px-2 py-2 text-xs text-muted">
             No environments yet
           </div>
 

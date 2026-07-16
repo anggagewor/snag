@@ -3,10 +3,9 @@ import { ref, computed, watch, nextTick } from 'vue'
 
 import { Search } from 'lucide-vue-next'
 
-import { useCollectionsStore } from '@/stores/collections'
+import { useWorkspaceStore } from '@/stores/workspace'
 import { useTabsStore } from '@/stores/tabs'
-import type { CollectionItem } from '@/types/collection'
-import type { UUID } from '@/types/common'
+import type { TreeNode, RequestId } from '@/domain'
 import BaseBadge from '@/components/base/BaseBadge.vue'
 
 const props = defineProps<{
@@ -17,7 +16,7 @@ const emit = defineEmits<{
   close: []
 }>()
 
-const collectionsStore = useCollectionsStore()
+const workspaceStore = useWorkspaceStore()
 const tabsStore = useTabsStore()
 
 const query = ref('')
@@ -25,66 +24,76 @@ const selectedIndex = ref(0)
 const inputRef = ref<HTMLInputElement | null>(null)
 
 interface SearchResult {
-  id: UUID
-  collectionId: UUID
+  requestId: string
+  collectionId: string
   collectionName: string
   name: string
-  item: CollectionItem
+  method: string
+  url: string
   path: string
+}
+
+// Cache for search — preloaded request metadata
+const searchIndex = ref<SearchResult[]>([])
+
+async function buildSearchIndex() {
+  const results: SearchResult[] = []
+
+  for (const col of workspaceStore.collections) {
+    await indexTreeNodes(col.items, col.id, col.name, '', results)
+  }
+
+  searchIndex.value = results
+}
+
+async function indexTreeNodes(
+  nodes: readonly TreeNode[],
+  collectionId: string,
+  collectionName: string,
+  parentPath: string,
+  results: SearchResult[],
+) {
+  for (const node of nodes) {
+    if (node.type === 'request') {
+      try {
+        const req = await workspaceStore.getRequest(node.requestId as RequestId)
+        results.push({
+          requestId: node.requestId,
+          collectionId,
+          collectionName,
+          name: req.name,
+          method: req.method,
+          url: req.url,
+          path: parentPath ? `${parentPath} / ${req.name}` : req.name,
+        })
+      } catch {
+        // Skip unavailable requests
+      }
+    } else if (node.type === 'folder') {
+      const currentPath = parentPath ? `${parentPath} / ${node.name}` : node.name
+      await indexTreeNodes(node.children, collectionId, collectionName, currentPath, results)
+    }
+  }
 }
 
 const results = computed<SearchResult[]>(() => {
   const q = query.value.toLowerCase().trim()
   if (!q) {
-    return getAllRequests().slice(0, 20)
+    return searchIndex.value.slice(0, 20)
   }
-  return getAllRequests().filter((r) =>
+  return searchIndex.value.filter(r =>
     r.name.toLowerCase().includes(q) ||
     r.collectionName.toLowerCase().includes(q) ||
-    r.item.request?.url.toLowerCase().includes(q) ||
-    r.item.request?.method.toLowerCase().includes(q)
+    r.url.toLowerCase().includes(q) ||
+    r.method.toLowerCase().includes(q)
   ).slice(0, 20)
 })
-
-function getAllRequests(): SearchResult[] {
-  const items: SearchResult[] = []
-  for (const col of collectionsStore.collections) {
-    flattenItems(col.items, col.id, col.name, '')
-      .forEach((r) => items.push(r))
-  }
-  return items
-}
-
-function flattenItems(
-  items: CollectionItem[],
-  collectionId: UUID,
-  collectionName: string,
-  parentPath: string
-): SearchResult[] {
-  const results: SearchResult[] = []
-  for (const item of items) {
-    const currentPath = parentPath ? `${parentPath} / ${item.name}` : item.name
-    if (item.type === 'request') {
-      results.push({
-        id: item.id,
-        collectionId,
-        collectionName,
-        name: item.name,
-        item,
-        path: currentPath,
-      })
-    }
-    if (item.items) {
-      results.push(...flattenItems(item.items, collectionId, collectionName, currentPath))
-    }
-  }
-  return results
-}
 
 watch(() => props.open, (isOpen) => {
   if (isOpen) {
     query.value = ''
     selectedIndex.value = 0
+    buildSearchIndex()
     nextTick(() => inputRef.value?.focus())
   }
 })
@@ -93,16 +102,64 @@ watch(query, () => {
   selectedIndex.value = 0
 })
 
-function selectResult(result: SearchResult) {
-  const sourceId = `${result.collectionId}:${result.id}`
-  if (result.item.request) {
+async function selectResult(result: SearchResult) {
+  try {
+    const request = await workspaceStore.getRequest(result.requestId as RequestId)
+    const sourceId = `${result.collectionId}:${result.requestId}`
     tabsStore.openRequestTab(
-      JSON.parse(JSON.stringify(result.item.request)),
-      result.name,
-      sourceId
+      {
+        id: request.id,
+        method: request.method as any,
+        url: request.url,
+        headers: request.headers.map(h => ({ id: crypto.randomUUID(), ...h })),
+        params: request.params.map(p => ({ id: crypto.randomUUID(), ...p })),
+        body: {
+          type: mapBodyType(request.body.type),
+          raw: request.body.content || undefined,
+          formData: request.body.formData?.map(f => ({
+            id: crypto.randomUUID(),
+            key: f.key,
+            value: f.value,
+            enabled: f.enabled,
+            fieldType: 'text' as const,
+          })),
+        },
+        auth: {
+          type: mapAuthType(request.auth.type),
+          bearer: request.auth.bearer,
+          basic: request.auth.basic,
+          apiKey: request.auth.apiKey ? {
+            key: request.auth.apiKey.key,
+            value: request.auth.apiKey.value,
+            addTo: request.auth.apiKey.in,
+          } : undefined,
+        },
+        preRequestScript: request.preRequest || undefined,
+        testScript: request.tests || undefined,
+        pathParams: [],
+      },
+      request.name,
+      sourceId,
     )
+  } catch (err) {
+    console.error('[SearchPalette] Failed to open request:', err)
   }
   emit('close')
+}
+
+function mapBodyType(type: string): any {
+  const map: Record<string, string> = {
+    none: 'none', json: 'json', xml: 'raw', text: 'raw',
+    formdata: 'form-data', urlencoded: 'x-www-form-urlencoded', binary: 'binary',
+  }
+  return map[type] ?? 'none'
+}
+
+function mapAuthType(type: string): any {
+  const map: Record<string, string> = {
+    none: 'none', basic: 'basic', bearer: 'bearer', apikey: 'api-key',
+  }
+  return map[type] ?? 'none'
 }
 
 function handleKeydown(e: KeyboardEvent) {
@@ -164,21 +221,21 @@ function handleKeydown(e: KeyboardEvent) {
           </div>
           <button
             v-for="(result, i) in results"
-            :key="result.id"
+            :key="result.requestId"
             class="w-full flex items-center gap-2 px-4 py-2 text-left text-sm transition-colors"
             :class="i === selectedIndex ? 'bg-accent/10 text-primary' : 'text-primary hover:bg-surface-hover'"
             @click="selectResult(result)"
             @mouseenter="selectedIndex = i"
           >
-            <BaseBadge v-if="result.item.request" :method="result.item.request.method" />
+            <BaseBadge :method="result.method as any" />
             <div class="flex-1 min-w-0">
               <div class="truncate font-medium text-xs">{{ result.name }}</div>
               <div class="truncate text-[10px] text-muted">
                 {{ result.collectionName }} / {{ result.path }}
               </div>
             </div>
-            <span v-if="result.item.request?.url" class="text-[10px] text-muted truncate max-w-[140px]">
-              {{ result.item.request.url }}
+            <span v-if="result.url" class="text-[10px] text-muted truncate max-w-[140px]">
+              {{ result.url }}
             </span>
           </button>
         </div>

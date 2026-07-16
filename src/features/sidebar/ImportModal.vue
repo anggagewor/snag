@@ -1,8 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 
-import { useCollectionsStore } from '@/stores/collections'
-import { useEnvironmentsStore } from '@/stores/environments'
+import { useWorkspaceStore } from '@/stores/workspace'
 import { importPostmanCollection } from '@/utils/import-postman'
 import { importOpenApiSpec } from '@/utils/import-openapi'
 import { importPostmanEnvironment, isPostmanEnvironment } from '@/utils/import-environment'
@@ -17,8 +16,7 @@ const emit = defineEmits<{
   close: []
 }>()
 
-const collectionsStore = useCollectionsStore()
-const environmentsStore = useEnvironmentsStore()
+const workspaceStore = useWorkspaceStore()
 
 const importType = ref<'postman' | 'openapi' | 'environment'>('postman')
 const importText = ref('')
@@ -88,8 +86,10 @@ async function handleImport() {
 
     if (importType.value === 'environment') {
       const env = importPostmanEnvironment(json)
-      environmentsStore.environments.push(env)
-      environmentsStore.save()
+      const created = await workspaceStore.createEnvironment(env.name)
+      // Save with imported variables
+      const updated = { ...created, variables: env.variables.map((v: any) => ({ key: v.key, value: v.value, enabled: v.enabled ?? true })) }
+      await workspaceStore.saveEnvironment(updated)
       importSuccess.value = `Imported environment "${env.name}" with ${env.variables.length} variables`
     } else {
       let collection
@@ -98,8 +98,46 @@ async function handleImport() {
       } else {
         collection = importOpenApiSpec(json)
       }
-      collectionsStore.collections.push(collection)
-      collectionsStore.save()
+
+      // Create collection in workspace and import items
+      const created = await workspaceStore.createCollection(collection.name)
+
+      // Write each request as individual file and build tree
+      const { ulid } = await import('@/domain')
+      type TreeNode = import('@/domain').TreeNode
+      type FolderId = import('@/domain').FolderId
+
+      async function importItems(items: any[]): Promise<TreeNode[]> {
+        const nodes: TreeNode[] = []
+        for (const item of items) {
+          if (item.type === 'folder') {
+            const folderId = ulid() as FolderId
+            const children = item.items ? await importItems(item.items) : []
+            nodes.push({ type: 'folder', id: folderId, name: item.name, children })
+          } else if (item.type === 'request' && item.request) {
+            const req = await workspaceStore.createRequest(created.id as any, null, {
+              name: item.name,
+              method: item.request.method || 'GET',
+            })
+            // Save full request data
+            const updated = {
+              ...req,
+              url: item.request.url || '',
+              headers: (item.request.headers || []).map((h: any) => ({ key: h.key, value: h.value, enabled: h.enabled ?? true })),
+              params: (item.request.params || []).map((p: any) => ({ key: p.key, value: p.value, enabled: p.enabled ?? true })),
+              body: { type: 'none' as const, content: item.request.body?.raw || '' },
+              auth: { type: 'none' as const },
+              preRequest: item.request.preRequestScript || '',
+              tests: item.request.testScript || '',
+            }
+            await workspaceStore.saveRequest(updated)
+          }
+        }
+        return nodes
+      }
+
+      await importItems(collection.items)
+      await workspaceStore.reloadCollection(created.id as any)
       importSuccess.value = `Imported "${collection.name}" with ${countRequests(collection.items)} requests`
     }
 
