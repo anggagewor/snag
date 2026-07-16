@@ -1,13 +1,59 @@
 <script setup lang="ts">
+import { ref, computed, onMounted } from 'vue'
 import { X, Plus } from 'lucide-vue-next'
+import { readDir, stat } from '@tauri-apps/plugin-fs'
+import { openPath } from '@tauri-apps/plugin-opener'
 
 import { useSettingsStore } from '@/stores/settings'
 import { useTheme } from '@/composables/useTheme'
+import { useStorageAdapter } from '@/services/provider'
 import BaseSelect from '@/components/base/BaseSelect.vue'
 import type { SelectOption } from '@/components/base/BaseSelect.vue'
+import BaseButton from '@/components/base/BaseButton.vue'
 
 const settingsStore = useSettingsStore()
 const { themeMode, setTheme } = useTheme()
+
+const storage = useStorageAdapter()
+const logsDir = storage.globalPath('logs')
+const logDirSize = ref(0)
+
+function formatSize(bytes: number): string {
+  if (bytes === 0) return '0 B'
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+}
+
+const formattedSize = computed(() => formatSize(logDirSize.value))
+
+async function computeLogSize() {
+  try {
+    const entries = await readDir(logsDir)
+    let total = 0
+    for (const entry of entries) {
+      if (entry.isFile) {
+        const s = await stat(`${logsDir}/${entry.name}`)
+        total += s.size ?? 0
+      }
+    }
+    logDirSize.value = total
+  } catch {
+    logDirSize.value = 0
+  }
+}
+
+async function openLogsDir() {
+  try {
+    await openPath(logsDir)
+  } catch {
+    // silently fail if directory doesn't exist yet
+  }
+}
+
+onMounted(() => {
+  computeLogSize()
+})
 
 const themeOptions: SelectOption[] = [
   { label: 'System', value: 'system' },
@@ -225,6 +271,23 @@ function addDefaultHeader() {
           <Plus class="w-3.5 h-3.5" />
           Add Header
         </button>
+      </div>
+    </section>
+
+    <!-- Diagnostics -->
+    <section class="space-y-4">
+      <h3 class="text-sm font-medium text-primary border-b border-border pb-2">
+        Diagnostics
+      </h3>
+
+      <div class="flex items-center justify-between">
+        <div>
+          <p class="text-sm text-primary">Application Logs</p>
+          <p class="text-xs text-muted">View log files for debugging ({{ formattedSize }})</p>
+        </div>
+        <BaseButton variant="secondary" size="sm" @click="openLogsDir">
+          View Logs
+        </BaseButton>
       </div>
     </section>
 

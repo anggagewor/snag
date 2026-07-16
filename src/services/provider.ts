@@ -11,17 +11,20 @@ import type { WorkspaceService } from './WorkspaceService'
 import type { RegistryService } from './RegistryService'
 import type { HistoryService } from './HistoryService'
 import type { SettingsService } from './SettingsService'
+import type { Logger } from './Logger'
 import { createTauriStorageAdapter, initGlobalRoot } from '../storage/TauriStorageAdapter'
 import { createWorkspaceService } from './createWorkspaceService'
 import { createRegistryService } from './createRegistryService'
 import { createHistoryService } from './createHistoryService'
 import { createSettingsService } from './createSettingsService'
+import { createLogger } from './Logger'
 
 let _storage: StorageAdapter | null = null
 let _workspace: WorkspaceService | null = null
 let _registry: RegistryService | null = null
 let _history: HistoryService | null = null
 let _settings: SettingsService | null = null
+let _logger: Logger | null = null
 let _initialized = false
 
 /**
@@ -37,9 +40,11 @@ export async function initServices(): Promise<void> {
   _registry = createRegistryService(_storage)
   _history = createHistoryService(_storage)
   _settings = createSettingsService(_storage)
+  _logger = createLogger(() => _storage!.globalPath('logs'))
 
   // Ensure global directories exist
   await _storage.ensureDir(_storage.globalPath('history'))
+  await _storage.ensureDir(_storage.globalPath('logs'))
 
   _initialized = true
 }
@@ -69,4 +74,8 @@ export function useSettingsService(): SettingsService {
 
 export function useStorageAdapter(): StorageAdapter {
   return requireInit(_storage, 'StorageAdapter')
+}
+
+export function useLogger(): Logger {
+  return requireInit(_logger, 'Logger')
 }

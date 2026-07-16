@@ -13,6 +13,8 @@ import TabBar from '@/features/tabs/TabBar.vue'
 import TabContent from '@/features/tabs/TabContent.vue'
 import BaseErrorBoundary from '@/components/base/BaseErrorBoundary.vue'
 import SearchPalette from '@/features/search/SearchPalette.vue'
+import ToastContainer from '@/features/notifications/ToastContainer.vue'
+import ErrorModalOverlay from '@/features/notifications/ErrorModalOverlay.vue'
 import type { StartupResult } from '@/services/startup'
 
 // Initialize theme
@@ -99,5 +101,7 @@ onMounted(async () => {
       </template>
     </DefaultLayout>
     <SearchPalette :open="showSearchPalette" @close="showSearchPalette = false" />
+    <ToastContainer />
+    <ErrorModalOverlay />
   </BaseErrorBoundary>
 </template>

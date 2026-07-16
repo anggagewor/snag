@@ -2,6 +2,8 @@ import { ref } from 'vue'
 
 import { useWorkspaceStore } from '@/stores/workspace'
 import { useSettingsStore } from '@/stores/settings'
+import { useTabsStore } from '@/stores/tabs'
+import { logAndNotify } from '@/services/logAndNotify'
 import type { ResponseData } from '@/domain'
 import type { RequestDraft, KeyValuePairEditable } from '@/domain'
 
@@ -136,11 +138,13 @@ export function useHttp() {
 
     const startTime = performance.now()
 
+    let finalUrl = ''
+
     try {
       const url = buildUrl(request.url, request.params, collectionVariables)
 
       // Add api-key to query if configured
-      let finalUrl = url
+      finalUrl = url
       if (request.auth.type === 'apikey' && request.auth.apiKey?.in === 'query') {
         const separator = finalUrl.includes('?') ? '&' : '?'
         finalUrl += `${separator}${encodeURIComponent(resolve(request.auth.apiKey.key, collectionVariables))}=${encodeURIComponent(resolve(request.auth.apiKey.value, collectionVariables))}`
@@ -185,8 +189,18 @@ export function useHttp() {
         requestMethod: request.method,
       }
     } catch (err) {
+      const metadata = { url: finalUrl, method: request.method }
+
       if (err instanceof DOMException && err.name === 'AbortError') {
-        error.value = `Request timed out after ${settingsStore.settings.timeout}s`
+        const message = `Request timed out after ${settingsStore.settings.timeout}s`
+        error.value = message
+
+        const retryFn = () => sendRequest(request, collectionVariables)
+        logAndNotify('useHttp', message, metadata, {
+          type: 'warn',
+          actionLabel: 'Retry',
+          callback: retryFn,
+        })
       } else if (err instanceof Error) {
         const msg = err.message || String(err)
 
@@ -194,13 +208,24 @@ export function useHttp() {
         const isSslError = /certificate|ssl|tls|self.signed|invalid.*cert/i.test(msg)
         if (isSslError && (settingsStore.settings.validateSsl ?? true)) {
           error.value = `SSL certificate error: ${msg}\n\nHint: If using a local/self-signed cert, disable "Verify SSL" in Settings.`
+
+          const openSettings = () => useTabsStore().openSettingsTab()
+          logAndNotify('useHttp', `SSL certificate error: ${msg}`, metadata, {
+            type: 'warn',
+            actionLabel: 'Go to Settings',
+            callback: openSettings,
+          })
         } else {
           error.value = msg
+
+          logAndNotify('useHttp', msg, metadata, { type: 'error' })
         }
       } else {
-        error.value = `Request failed: ${String(err)}`
+        const message = `Request failed: ${String(err)}`
+        error.value = message
+
+        logAndNotify('useHttp', message, metadata, { type: 'error' })
       }
-      console.error('[useHttp] Request error:', err)
       return null
     } finally {
       clearTimeout(timeoutId)
