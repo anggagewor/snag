@@ -91,8 +91,13 @@ export const useEnvironmentsStore = defineStore('environments', () => {
     }
   }
 
-  function resolveVariablesInString(str: string): string {
+  function resolveVariablesInString(str: string, collectionVariables?: { key: string; value: string }[]): string {
     return str.replace(/\{\{(\w+)\}\}/g, (_, key) => {
+      // Resolution order: collection-level → environment-level
+      if (collectionVariables) {
+        const cv = collectionVariables.find((v) => v.key === key)
+        if (cv) return cv.value
+      }
       return resolvedVariables.value[key] ?? `{{${key}}}`
     })
   }

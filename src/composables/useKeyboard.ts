@@ -13,7 +13,7 @@ export function useKeyboard() {
     const tab = tabsStore.activeTab
     if (!tab || tab.type !== 'request' || !tab.request?.url) return
 
-    const response = await sendRequest(tab.request)
+    const response = await sendRequest(tab.request, tab.collectionVariables)
     tabsStore.updateTabResponse(tab.id, response)
     historyStore.addEntry(tab.request, response)
   }

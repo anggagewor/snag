@@ -13,6 +13,7 @@ import SidebarPanel from '@/features/sidebar/SidebarPanel.vue'
 import TabBar from '@/features/tabs/TabBar.vue'
 import TabContent from '@/features/tabs/TabContent.vue'
 import BaseErrorBoundary from '@/components/base/BaseErrorBoundary.vue'
+import SearchPalette from '@/features/search/SearchPalette.vue'
 
 // Initialize theme
 const { loadTheme } = useTheme()
@@ -22,6 +23,7 @@ useKeyboard()
 
 // Layout ref for sidebar toggle
 const layoutRef = ref<InstanceType<typeof DefaultLayout> | null>(null)
+const showSearchPalette = ref(false)
 
 function handleToggleSidebar() {
   layoutRef.value?.toggleSidebar()
@@ -33,6 +35,10 @@ onMounted(() => {
     if ((e.metaKey || e.ctrlKey) && e.key === 'b') {
       e.preventDefault()
       handleToggleSidebar()
+    }
+    if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+      e.preventDefault()
+      showSearchPalette.value = !showSearchPalette.value
     }
   })
 })
@@ -63,9 +69,10 @@ onMounted(async () => {
         <SidebarPanel />
       </template>
       <template #content>
-        <TabBar />
+        <TabBar @toggle-sidebar="handleToggleSidebar" />
         <TabContent />
       </template>
     </DefaultLayout>
+    <SearchPalette :open="showSearchPalette" @close="showSearchPalette = false" />
   </BaseErrorBoundary>
 </template>

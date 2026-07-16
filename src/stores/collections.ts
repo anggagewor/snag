@@ -144,6 +144,54 @@ export const useCollectionsStore = defineStore('collections', () => {
     save()
   }
 
+  /**
+   * Move an item within or between parents in the same collection.
+   * Removes from current position and inserts at target position.
+   */
+  function moveItem(
+    collectionId: UUID,
+    itemId: UUID,
+    targetParentId: UUID | null,
+    targetIndex: number
+  ) {
+    const collection = collections.value.find((c) => c.id === collectionId)
+    if (!collection) return
+
+    // Find and remove item from its current location
+    let movedItem: CollectionItem | null = null
+
+    function removeFrom(items: CollectionItem[]): boolean {
+      const index = items.findIndex((i) => i.id === itemId)
+      if (index !== -1) {
+        movedItem = items.splice(index, 1)[0]
+        return true
+      }
+      for (const item of items) {
+        if (item.items && removeFrom(item.items)) return true
+      }
+      return false
+    }
+
+    removeFrom(collection.items)
+    if (!movedItem) return
+
+    // Insert into target location
+    if (targetParentId) {
+      const parent = findItem(collection.items, targetParentId)
+      if (parent && parent.type === 'folder') {
+        parent.items = parent.items || []
+        const idx = Math.min(targetIndex, parent.items.length)
+        parent.items.splice(idx, 0, movedItem)
+      }
+    } else {
+      const idx = Math.min(targetIndex, collection.items.length)
+      collection.items.splice(idx, 0, movedItem)
+    }
+
+    collection.updatedAt = new Date().toISOString()
+    save()
+  }
+
   return {
     collections,
     isLoading,
@@ -157,5 +205,6 @@ export const useCollectionsStore = defineStore('collections', () => {
     removeItem,
     findItem,
     insertAfter,
+    moveItem,
   }
 })

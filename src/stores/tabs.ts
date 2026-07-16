@@ -20,6 +20,8 @@ export interface Tab {
   isDirty: boolean
   /** Links this tab to a collection item (collectionId:itemId) */
   sourceId?: string
+  /** Collection-level variables (resolved from source collection) */
+  collectionVariables?: { key: string; value: string }[]
 }
 
 interface TabsSnapshot {
@@ -77,6 +79,17 @@ export const useTabsStore = defineStore('tabs', () => {
       }
     }
 
+    // Resolve collection variables from source
+    let collectionVariables: { key: string; value: string }[] | undefined
+    if (sourceId) {
+      const [collectionId] = sourceId.split(':')
+      const collectionsStore = useCollectionsStore()
+      const collection = collectionsStore.collections.find((c) => c.id === collectionId)
+      if (collection?.variables && collection.variables.length > 0) {
+        collectionVariables = [...collection.variables]
+      }
+    }
+
     const req = request || createEmptyRequest()
     const tab: Tab = {
       id: crypto.randomUUID(),
@@ -86,6 +99,7 @@ export const useTabsStore = defineStore('tabs', () => {
       response: null,
       isDirty: false,
       sourceId,
+      collectionVariables,
     }
     tabs.value.push(tab)
     activeTabId.value = tab.id
@@ -132,10 +146,23 @@ export const useTabsStore = defineStore('tabs', () => {
     activeTabId.value = id
   }
 
+  /** Pending tab ID awaiting close confirmation (dirty tab) */
+  const pendingCloseTabId = ref<UUID | null>(null)
+
   function closeTab(id: UUID) {
+    const tab = tabs.value.find((t) => t.id === id)
+    if (tab && tab.isDirty) {
+      pendingCloseTabId.value = id
+      return
+    }
+    forceCloseTab(id)
+  }
+
+  function forceCloseTab(id: UUID) {
     const index = tabs.value.findIndex((t) => t.id === id)
     if (index === -1) return
 
+    pendingCloseTabId.value = null
     tabs.value.splice(index, 1)
 
     if (activeTabId.value === id) {
@@ -146,6 +173,10 @@ export const useTabsStore = defineStore('tabs', () => {
         activeTabId.value = null
       }
     }
+  }
+
+  function cancelCloseTab() {
+    pendingCloseTabId.value = null
   }
 
   function updateTabRequest(id: UUID, request: Partial<RequestConfig>) {
@@ -232,12 +263,15 @@ export const useTabsStore = defineStore('tabs', () => {
     activeTab,
     tabCount,
     isLoaded,
+    pendingCloseTabId,
     load,
     openRequestTab,
     openSettingsTab,
     openEnvironmentsTab,
     setActiveTab,
     closeTab,
+    forceCloseTab,
+    cancelCloseTab,
     updateTabRequest,
     updateTabResponse,
     updateTabTitle,

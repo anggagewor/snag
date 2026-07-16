@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, nextTick } from 'vue'
 
-import { Settings, Check, Save, Plus, Folder, FlaskConical } from 'lucide-vue-next'
+import { Settings, Check, Save, Plus, Folder, FlaskConical, PanelLeft } from 'lucide-vue-next'
 
 import { useTabsStore } from '@/stores/tabs'
 import { useCollectionsStore } from '@/stores/collections'
@@ -15,6 +15,10 @@ import EnvironmentSelector from '@/features/environments/EnvironmentSelector.vue
 
 const tabsStore = useTabsStore()
 const collectionsStore = useCollectionsStore()
+
+const emit = defineEmits<{
+  toggleSidebar: []
+}>()
 
 // Rename state
 const renamingTabId = ref<UUID | null>(null)
@@ -78,10 +82,31 @@ function saveToCollection() {
   tabsStore.linkTabToSource(tab.id, `${saveTargetCollectionId.value}:${itemId}`)
   showSaveModal.value = false
 }
+
+function handleSaveAndClose() {
+  const tabId = tabsStore.pendingCloseTabId
+  if (!tabId) return
+  const tab = tabsStore.tabs.find((t) => t.id === tabId)
+  if (tab && tab.type === 'request' && tab.isDirty) {
+    if (tab.sourceId) {
+      tabsStore.saveTab(tabId)
+    }
+  }
+  tabsStore.forceCloseTab(tabId)
+}
 </script>
 
 <template>
   <div class="flex items-center h-[41px] border-b border-border bg-surface-alt">
+    <!-- Sidebar toggle -->
+    <button
+      class="p-2 mx-0.5 text-muted hover:text-primary hover:bg-surface-hover rounded transition-colors flex-shrink-0"
+      title="Toggle Sidebar (Cmd+B)"
+      @click="emit('toggleSidebar')"
+    >
+      <PanelLeft class="w-4 h-4" />
+    </button>
+
     <!-- Scrollable tab area -->
     <div class="flex-1 flex items-center overflow-x-auto">
       <BaseTab
@@ -172,6 +197,24 @@ function saveToCollection() {
       </div>
     </div>
   </div>
+
+  <!-- Unsaved Changes Warning Modal -->
+  <BaseModal :open="!!tabsStore.pendingCloseTabId" title="Unsaved Changes" @close="tabsStore.cancelCloseTab()">
+    <p class="text-sm text-secondary">
+      This tab has unsaved changes. Do you want to save before closing?
+    </p>
+    <template #footer>
+      <button class="px-3 py-1.5 text-sm rounded-md text-secondary hover:text-primary" @click="tabsStore.cancelCloseTab()">
+        Cancel
+      </button>
+      <button class="px-3 py-1.5 text-sm rounded-md text-error hover:bg-error/5" @click="tabsStore.forceCloseTab(tabsStore.pendingCloseTabId!)">
+        Discard
+      </button>
+      <button class="px-3 py-1.5 text-sm rounded-md bg-accent text-white hover:bg-accent-hover" @click="handleSaveAndClose()">
+        Save & Close
+      </button>
+    </template>
+  </BaseModal>
 
   <!-- Save to Collection Modal -->
   <BaseModal :open="showSaveModal" title="Save to Collection" @close="showSaveModal = false">

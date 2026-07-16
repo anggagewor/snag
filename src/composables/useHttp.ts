@@ -21,25 +21,25 @@ export function useHttp() {
 
   let abortController: AbortController | null = null
 
-  function resolve(str: string): string {
+  function resolve(str: string, collectionVariables?: { key: string; value: string }[]): string {
     const envStore = useEnvironmentsStore()
-    return envStore.resolveVariablesInString(str)
+    return envStore.resolveVariablesInString(str, collectionVariables)
   }
 
-  function buildUrl(url: string, params: KeyValuePair[]): string {
-    const resolvedUrl = resolve(url)
+  function buildUrl(url: string, params: KeyValuePair[], collectionVariables?: { key: string; value: string }[]): string {
+    const resolvedUrl = resolve(url, collectionVariables)
     const enabledParams = params.filter((p) => p.enabled && p.key)
     if (enabledParams.length === 0) return resolvedUrl
 
     const separator = resolvedUrl.includes('?') ? '&' : '?'
     const queryString = enabledParams
-      .map((p) => `${encodeURIComponent(resolve(p.key))}=${encodeURIComponent(resolve(p.value))}`)
+      .map((p) => `${encodeURIComponent(resolve(p.key, collectionVariables))}=${encodeURIComponent(resolve(p.value, collectionVariables))}`)
       .join('&')
 
     return `${resolvedUrl}${separator}${queryString}`
   }
 
-  function buildHeaders(request: RequestConfig): Record<string, string> {
+  function buildHeaders(request: RequestConfig, collectionVariables?: { key: string; value: string }[]): Record<string, string> {
     const headers: Record<string, string> = {}
     const settingsStore = useSettingsStore()
 
@@ -57,32 +57,32 @@ export function useHttp() {
     request.headers
       .filter((h) => h.enabled && h.key)
       .forEach((h) => {
-        headers[resolve(h.key)] = resolve(h.value)
+        headers[resolve(h.key, collectionVariables)] = resolve(h.value, collectionVariables)
       })
 
     // Add auth headers
     if (request.auth.type === 'bearer' && request.auth.bearer) {
-      headers['Authorization'] = `Bearer ${resolve(request.auth.bearer.token)}`
+      headers['Authorization'] = `Bearer ${resolve(request.auth.bearer.token, collectionVariables)}`
     } else if (request.auth.type === 'basic' && request.auth.basic) {
-      const encoded = btoa(`${resolve(request.auth.basic.username)}:${resolve(request.auth.basic.password)}`)
+      const encoded = btoa(`${resolve(request.auth.basic.username, collectionVariables)}:${resolve(request.auth.basic.password, collectionVariables)}`)
       headers['Authorization'] = `Basic ${encoded}`
     } else if (request.auth.type === 'api-key' && request.auth.apiKey?.addTo === 'header') {
-      headers[resolve(request.auth.apiKey.key)] = resolve(request.auth.apiKey.value)
+      headers[resolve(request.auth.apiKey.key, collectionVariables)] = resolve(request.auth.apiKey.value, collectionVariables)
     }
 
     return headers
   }
 
-  async function buildBody(request: RequestConfig): Promise<BodyInit | undefined> {
+  async function buildBody(request: RequestConfig, collectionVariables?: { key: string; value: string }[]): Promise<BodyInit | undefined> {
     const { body } = request
 
     if (body.type === 'none') return undefined
-    if (body.type === 'json' || body.type === 'raw') return resolve(body.raw || '') || undefined
+    if (body.type === 'json' || body.type === 'raw') return resolve(body.raw || '', collectionVariables) || undefined
 
     if (body.type === 'x-www-form-urlencoded') {
       const params = (body.urlencoded || [])
         .filter((p) => p.enabled && p.key)
-        .map((p) => `${encodeURIComponent(resolve(p.key))}=${encodeURIComponent(resolve(p.value))}`)
+        .map((p) => `${encodeURIComponent(resolve(p.key, collectionVariables))}=${encodeURIComponent(resolve(p.value, collectionVariables))}`)
         .join('&')
       return params || undefined
     }
@@ -107,9 +107,9 @@ export function useHttp() {
           const fileBytes = await readFile(field.value)
           const fileName = field.fileName || field.value.split('/').pop() || 'file'
           const blob = new Blob([fileBytes])
-          formData.append(resolve(field.key), blob, fileName)
+          formData.append(resolve(field.key, collectionVariables), blob, fileName)
         } else if (field.fieldType === 'text') {
-          formData.append(resolve(field.key), resolve(field.value))
+          formData.append(resolve(field.key, collectionVariables), resolve(field.value, collectionVariables))
         }
       }
 
@@ -124,7 +124,7 @@ export function useHttp() {
     return undefined
   }
 
-  async function sendRequest(request: RequestConfig): Promise<ResponseData | null> {
+  async function sendRequest(request: RequestConfig, collectionVariables?: { key: string; value: string }[]): Promise<ResponseData | null> {
     // Abort any in-flight request
     if (abortController) {
       abortController.abort()
@@ -149,23 +149,23 @@ export function useHttp() {
           if (param.value) {
             urlWithPathParams = urlWithPathParams.replace(
               new RegExp(`:${param.key}\\b`, 'g'),
-              resolve(param.value)
+              resolve(param.value, collectionVariables)
             )
           }
         }
       }
 
-      const url = buildUrl(urlWithPathParams, request.params)
+      const url = buildUrl(urlWithPathParams, request.params, collectionVariables)
 
       // Add api-key to query if configured
       let finalUrl = url
       if (request.auth.type === 'api-key' && request.auth.apiKey?.addTo === 'query') {
         const separator = finalUrl.includes('?') ? '&' : '?'
-        finalUrl += `${separator}${encodeURIComponent(resolve(request.auth.apiKey.key))}=${encodeURIComponent(resolve(request.auth.apiKey.value))}`
+        finalUrl += `${separator}${encodeURIComponent(resolve(request.auth.apiKey.key, collectionVariables))}=${encodeURIComponent(resolve(request.auth.apiKey.value, collectionVariables))}`
       }
 
-      const headers = buildHeaders(request)
-      const body = await buildBody(request)
+      const headers = buildHeaders(request, collectionVariables)
+      const body = await buildBody(request, collectionVariables)
 
       // Set content-type for JSON
       if (request.body.type === 'json' && !headers['Content-Type']) {

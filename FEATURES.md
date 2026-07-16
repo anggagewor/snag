@@ -114,14 +114,14 @@
 
 | Feature | Deskripsi |
 |---------|-----------|
-| **Pre-request scripts** | JavaScript sandbox yang jalan sebelum request (set variables, manipulate headers, generate timestamps/signatures) |
-| **Test scripts (post-response)** | Assert response status, body, headers. Basic test runner + pass/fail indicator |
-| **Search collections** (`Cmd+K`) | Quick search / command palette buat jump ke request manapun |
-| **Drag & drop reorder** | Reorder items di collection tree via drag |
-| **Request duplication** | Duplicate request dalam collection (satu klik) |
-| **Collection variables** | Variables yang scoped ke collection (bukan global environment) |
-| **Unsaved changes warning** | Confirm dialog saat close tab yang dirty |
-| **Export collection as cURL** | Generate cURL command dari request yang aktif |
+| ~~**Pre-request scripts**~~ | ✅ JavaScript sandbox yang jalan sebelum request (set variables, manipulate headers, generate timestamps/signatures) |
+| ~~**Test scripts (post-response)**~~ | ✅ Assert response status, body, headers. Basic test runner + pass/fail indicator |
+| ~~**Search collections**~~ (`Cmd+K`) | ✅ Quick search / command palette buat jump ke request manapun |
+| ~~**Drag & drop reorder**~~ | ✅ Reorder items di collection tree via drag |
+| ~~**Request duplication**~~ | ✅ Duplicate request dalam collection (context menu) |
+| ~~**Collection variables**~~ | ✅ Variables yang scoped ke collection (bukan global environment) |
+| ~~**Unsaved changes warning**~~ | ✅ Confirm dialog saat close tab yang dirty |
+| ~~**Export collection as cURL**~~ | ✅ Generate cURL command dari request (context menu "Copy as cURL") |
 
 ### Medium Priority (v1.x ~ v2)
 
