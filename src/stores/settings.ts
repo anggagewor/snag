@@ -19,7 +19,7 @@ import type { ResolvedSettings } from '@/services/SettingsService'
 export type { ResolvedSettings } from '@/services/SettingsService'
 
 const DEFAULT_GLOBAL: GlobalSettings = {
-  theme: 'dark',
+  theme: 'system',
   fontSize: 13,
   fontFamily: 'SF Mono, Menlo, Monaco, monospace',
   language: 'en',

@@ -20,19 +20,27 @@
     "fs:default",
     {
       "identifier": "fs:allow-read-text-file",
-      "allow": [{ "path": "$APPDATA/**" }]
+      "allow": [{ "path": "$APPDATA/**" }, { "path": "**" }]
     },
     {
       "identifier": "fs:allow-write-text-file",
-      "allow": [{ "path": "$APPDATA/**" }]
+      "allow": [{ "path": "$APPDATA/**" }, { "path": "**" }]
     },
     {
       "identifier": "fs:allow-exists",
-      "allow": [{ "path": "$APPDATA/**" }]
+      "allow": [{ "path": "$APPDATA/**" }, { "path": "**" }]
     },
     {
       "identifier": "fs:allow-mkdir",
-      "allow": [{ "path": "$APPDATA/**" }]
+      "allow": [{ "path": "$APPDATA/**" }, { "path": "**" }]
+    },
+    {
+      "identifier": "fs:allow-remove",
+      "allow": [{ "path": "$APPDATA/**" }, { "path": "**" }]
+    },
+    {
+      "identifier": "fs:allow-read-dir",
+      "allow": [{ "path": "$APPDATA/**" }, { "path": "**" }]
     },
     {
       "identifier": "fs:allow-read-file",

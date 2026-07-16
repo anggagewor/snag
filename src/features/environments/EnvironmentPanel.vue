@@ -31,9 +31,13 @@ async function createEnv() {
 }
 
 async function deleteEnv(id: string) {
-  await workspaceStore.deleteEnvironment(id as EnvironmentId)
-  if (selectedEnvId.value === id) {
-    selectedEnvId.value = workspaceStore.environments[0]?.id || null
+  try {
+    await workspaceStore.deleteEnvironment(id as EnvironmentId)
+    if (selectedEnvId.value === id) {
+      selectedEnvId.value = workspaceStore.environments[0]?.id || null
+    }
+  } catch (err) {
+    console.error('[EnvironmentPanel] Failed to delete environment:', err)
   }
 }
 

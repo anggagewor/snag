@@ -19,7 +19,7 @@ import {
 const SETTINGS_FILE = 'settings.json'
 
 const DEFAULT_GLOBAL_SETTINGS: GlobalSettings = {
-  theme: 'dark',
+  theme: 'system',
   fontSize: 13,
   fontFamily: 'SF Mono, Menlo, Monaco, monospace',
   language: 'en',

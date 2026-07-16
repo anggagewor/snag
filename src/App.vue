@@ -17,7 +17,7 @@ import ToastContainer from '@/features/notifications/ToastContainer.vue'
 import ErrorModalOverlay from '@/features/notifications/ErrorModalOverlay.vue'
 import type { StartupResult } from '@/services/startup'
 
-// Initialize theme
+// Initialize theme (apply system preference immediately, before settings load)
 const { loadFromSettings } = useTheme()
 
 // Register keyboard shortcuts

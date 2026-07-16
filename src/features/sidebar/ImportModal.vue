@@ -160,7 +160,7 @@ async function handleImport() {
     importText.value = ''
     handleClose()
   } catch (err) {
-    importError.value = err instanceof Error ? err.message : 'Failed to parse file'
+    importError.value = err instanceof Error ? err.message : String(err || 'Failed to import')
     console.error('[Import]', err)
   } finally {
     isImporting.value = false
