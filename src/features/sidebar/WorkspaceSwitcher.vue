@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, nextTick } from 'vue'
 import { ChevronDown, Plus, FolderOpen } from 'lucide-vue-next'
 import { useWorkspaceStore } from '@/stores/workspace'
 import BaseDropdown from '@/components/base/BaseDropdown.vue'
+import BaseModal from '@/components/base/BaseModal.vue'
 
 const workspaceStore = useWorkspaceStore()
 
@@ -14,8 +15,9 @@ const emit = defineEmits<{
   open: []
 }>()
 
-const showCreateInput = ref(false)
+const showCreateModal = ref(false)
 const newWorkspaceName = ref('')
+const nameInputRef = ref<HTMLInputElement | null>(null)
 const dropdownRef = ref<InstanceType<typeof BaseDropdown> | null>(null)
 
 function handleSwitch(path: string) {
@@ -34,6 +36,18 @@ async function handleOpenFolder() {
   }
 }
 
+function openCreateModal() {
+  dropdownRef.value?.close()
+  showCreateModal.value = true
+  newWorkspaceName.value = ''
+  nextTick(() => nameInputRef.value?.focus())
+}
+
+function closeCreateModal() {
+  showCreateModal.value = false
+  newWorkspaceName.value = ''
+}
+
 async function handleCreate() {
   if (!newWorkspaceName.value.trim()) return
 
@@ -42,15 +56,9 @@ async function handleCreate() {
     const folderPath = await open({ directory: true, title: 'Choose workspace location' })
     if (folderPath) {
       emit('create', newWorkspaceName.value.trim(), folderPath as string)
-      newWorkspaceName.value = ''
-      showCreateInput.value = false
-      dropdownRef.value?.close()
+      closeCreateModal()
     }
   }
-}
-
-function handleShowCreate() {
-  showCreateInput.value = true
 }
 
 function truncatePath(path: string, maxLen = 30): string {
@@ -90,34 +98,9 @@ function truncatePath(path: string, maxLen = 30): string {
         <div class="border-t border-border my-0.5" />
 
         <!-- Create new workspace -->
-        <div v-if="showCreateInput" class="px-3 py-2">
-          <input
-            v-model="newWorkspaceName"
-            type="text"
-            placeholder="Workspace name"
-            class="w-full px-2 py-1 text-xs bg-surface border border-border rounded focus:outline-none focus:border-accent"
-            @keydown.enter="handleCreate"
-            @keydown.escape="showCreateInput = false; newWorkspaceName = ''"
-          />
-          <div class="flex justify-end gap-1 mt-1.5">
-            <button
-              class="px-2 py-0.5 text-[10px] text-muted hover:text-primary rounded"
-              @click="showCreateInput = false; newWorkspaceName = ''"
-            >
-              Cancel
-            </button>
-            <button
-              class="px-2 py-0.5 text-[10px] text-accent hover:bg-accent/10 rounded"
-              @click="handleCreate"
-            >
-              Choose Folder
-            </button>
-          </div>
-        </div>
         <button
-          v-else
           class="w-full flex items-center gap-2 px-3 py-2 text-xs text-primary hover:bg-surface-hover text-left"
-          @click="handleShowCreate"
+          @click="openCreateModal"
         >
           <Plus class="w-3.5 h-3.5 text-muted" />
           Create New Workspace
@@ -134,4 +117,37 @@ function truncatePath(path: string, maxLen = 30): string {
       </div>
     </template>
   </BaseDropdown>
+
+  <!-- Create Workspace Modal -->
+  <BaseModal :open="showCreateModal" title="Create New Workspace" @close="closeCreateModal">
+    <div class="space-y-3">
+      <div class="space-y-1.5">
+        <label class="block text-xs text-secondary">Workspace Name</label>
+        <input
+          ref="nameInputRef"
+          v-model="newWorkspaceName"
+          type="text"
+          placeholder="My API Project"
+          class="w-full px-3 py-2 text-sm bg-surface border border-border rounded-md text-primary placeholder:text-muted focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent/50"
+          @keydown.enter="handleCreate"
+        />
+      </div>
+      <p class="text-xs text-muted">You'll choose a folder location in the next step.</p>
+    </div>
+    <template #footer>
+      <button
+        class="px-3 py-1.5 text-sm rounded-md text-secondary hover:text-primary"
+        @click="closeCreateModal"
+      >
+        Cancel
+      </button>
+      <button
+        class="px-3 py-1.5 text-sm rounded-md bg-accent text-white hover:bg-accent-hover disabled:opacity-50"
+        :disabled="!newWorkspaceName.trim()"
+        @click="handleCreate"
+      >
+        Choose Folder
+      </button>
+    </template>
+  </BaseModal>
 </template>

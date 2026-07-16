@@ -25,6 +25,12 @@ const DEFAULT_GLOBAL: GlobalSettings = {
   language: 'en',
 }
 
+const DEFAULT_HEADERS: readonly { readonly key: string; readonly value: string }[] = [
+  { key: 'User-Agent', value: 'SnagRuntime/1.0.0' },
+  { key: 'Accept', value: '*/*' },
+  { key: 'Accept-Encoding', value: 'gzip, deflate, br' },
+]
+
 function mergeSettings(
   global: GlobalSettings,
   workspace: WorkspaceSettings | null,
@@ -37,7 +43,7 @@ function mergeSettings(
     language: global.language,
     // Workspace-overridable fields (with defaults)
     proxy: workspace?.proxy ?? undefined,
-    defaultHeaders: workspace?.defaultHeaders ?? undefined,
+    defaultHeaders: workspace?.defaultHeaders ?? DEFAULT_HEADERS,
     timeout: workspace?.timeout ?? 30,
     followRedirects: workspace?.followRedirects ?? true,
     validateSsl: workspace?.validateSsl ?? true,
