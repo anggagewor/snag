@@ -44,69 +44,10 @@ async function openRequest(requestId: string) {
   try {
     const request = await workspaceStore.getRequest(requestId as RequestId)
     const sourceId = `${props.collectionId}:${requestId}`
-    // Open in tabs using the legacy store for now (tabs will be refactored later)
-    tabsStore.openRequestTab(
-      {
-        id: request.id,
-        method: request.method as any,
-        url: request.url,
-        headers: request.headers.map(h => ({ id: crypto.randomUUID(), ...h })),
-        params: request.params.map(p => ({ id: crypto.randomUUID(), ...p })),
-        body: {
-          type: mapBodyType(request.body.type),
-          raw: request.body.content || undefined,
-          formData: request.body.formData?.map(f => ({
-            id: crypto.randomUUID(),
-            key: f.key,
-            value: f.value,
-            enabled: f.enabled,
-            fieldType: 'text' as const,
-          })),
-        },
-        auth: {
-          type: mapAuthType(request.auth.type),
-          bearer: request.auth.bearer,
-          basic: request.auth.basic,
-          apiKey: request.auth.apiKey ? {
-            key: request.auth.apiKey.key,
-            value: request.auth.apiKey.value,
-            addTo: request.auth.apiKey.in,
-          } : undefined,
-        },
-        preRequestScript: request.preRequest || undefined,
-        testScript: request.tests || undefined,
-        pathParams: [],
-      },
-      request.name,
-      sourceId,
-    )
+    tabsStore.openRequestTab(requestId as RequestId, sourceId, request.name)
   } catch (err) {
     console.error('[CollectionTreeItem] Failed to open request:', err)
   }
-}
-
-function mapBodyType(type: string): any {
-  const map: Record<string, string> = {
-    none: 'none',
-    json: 'json',
-    xml: 'raw',
-    text: 'raw',
-    formdata: 'form-data',
-    urlencoded: 'x-www-form-urlencoded',
-    binary: 'binary',
-    graphql: 'raw',
-  }
-  return map[type] ?? 'none'
-}
-
-function mapAuthType(type: string): any {
-  const map: Record<string, string> = {
-    none: 'none',
-    basic: 'basic',
-    bearer: 'bearer',
-    apikey: 'api-key',
-  }
-  return map[type] ?? 'none'
 }
 
 async function addRequestToFolder(folderId: string) {
@@ -198,8 +139,6 @@ async function onDrop(e: DragEvent) {
     )
     ctx.expandedIds.value.add(props.item.id)
   } else {
-    // For before/after, we move relative to current item's parent
-    // Simplified: move to root level at appropriate index
     const targetIndex = position === 'after' ? 1 : 0
     await workspaceStore.moveItem(
       props.collectionId as CollectionId,

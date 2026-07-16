@@ -3,18 +3,18 @@ import { computed } from 'vue'
 
 import { X } from 'lucide-vue-next'
 
-import type { KeyValuePair } from '@/types/common'
+import type { KeyValuePairEditable } from '@/domain'
 import BaseEnvInput from '@/components/base/BaseEnvInput.vue'
 
 const props = defineProps<{
-  modelValue: KeyValuePair[]
+  modelValue: KeyValuePairEditable[]
   keyPlaceholder?: string
   valuePlaceholder?: string
   readonly?: boolean
 }>()
 
 const emit = defineEmits<{
-  'update:modelValue': [value: KeyValuePair[]]
+  'update:modelValue': [value: KeyValuePairEditable[]]
 }>()
 
 // Always show at least one empty row
@@ -25,7 +25,7 @@ const rows = computed(() => {
   return props.modelValue
 })
 
-function syncRows(updated: KeyValuePair[]) {
+function syncRows(updated: KeyValuePairEditable[]) {
   const cleaned = updated.filter((item, i) => {
     if (i === updated.length - 1) return true
     return item.key !== '' || item.value !== ''

@@ -1,11 +1,7 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref } from 'vue'
 
-import { useSettingsStore } from '@/stores/settings'
-
-const settingsStore = useSettingsStore()
-
-const sidebarWidth = computed(() => settingsStore.settings.sidebarWidth)
+const SIDEBAR_WIDTH = 280
 const isSidebarCollapsed = ref(false)
 
 function toggleSidebar() {
@@ -20,9 +16,9 @@ defineExpose({ toggleSidebar })
     <!-- Sidebar -->
     <aside
       class="flex-shrink-0 border-r border-border bg-surface-alt overflow-hidden transition-all duration-200"
-      :style="{ width: isSidebarCollapsed ? '0px' : `${sidebarWidth}px` }"
+      :style="{ width: isSidebarCollapsed ? '0px' : `${SIDEBAR_WIDTH}px` }"
     >
-      <div class="h-full overflow-y-auto" :style="{ width: `${sidebarWidth}px` }">
+      <div class="h-full overflow-y-auto" :style="{ width: `${SIDEBAR_WIDTH}px` }">
         <slot name="sidebar" />
       </div>
     </aside>

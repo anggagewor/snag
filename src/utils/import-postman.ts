@@ -1,17 +1,61 @@
-import { HttpMethod } from '@/types/common'
-import type { KeyValuePair } from '@/types/common'
-import type { Collection, CollectionItem } from '@/types/collection'
-import type { RequestConfig, AuthConfig, RequestBody, FormDataField } from '@/types/request'
+import type { HttpMethod } from '@/domain'
+
+const HTTP_METHODS: HttpMethod[] = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS']
+
+/**
+ * Imported collection item — intermediate format used by ImportModal
+ * to create requests in the workspace.
+ */
+export interface ImportedCollectionItem {
+  id: string
+  type: 'request' | 'folder'
+  name: string
+  items?: ImportedCollectionItem[]
+  request?: ImportedRequest
+}
+
+export interface ImportedRequest {
+  method: HttpMethod
+  url: string
+  headers: { key: string; value: string; enabled: boolean }[]
+  params: { key: string; value: string; enabled: boolean }[]
+  body: ImportedRequestBody
+  auth: ImportedRequestAuth
+  preRequest: string
+  tests: string
+}
+
+export interface ImportedRequestBody {
+  type: 'none' | 'json' | 'text' | 'xml' | 'formdata' | 'urlencoded' | 'binary' | 'graphql'
+  content: string
+  formData?: { key: string; value: string; enabled: boolean; fieldType?: 'text' | 'file'; fileName?: string }[]
+  binaryPath?: string
+}
+
+export interface ImportedRequestAuth {
+  type: 'none' | 'basic' | 'bearer' | 'apikey'
+  basic?: { username: string; password: string }
+  bearer?: { token: string }
+  apiKey?: { key: string; value: string; in: 'header' | 'query' }
+}
+
+export interface ImportedCollection {
+  id: string
+  name: string
+  description?: string
+  items: ImportedCollectionItem[]
+  variables?: { key: string; value: string }[]
+}
 
 /**
  * Import a Postman Collection v2.1 JSON file into Snag Collection format.
  * Supports: folders, requests, headers, params, body (raw/json/formdata/urlencoded), auth (bearer/basic/apikey).
  */
-export function importPostmanCollection(json: unknown): Collection {
+export function importPostmanCollection(json: unknown): ImportedCollection {
   const data = json as PostmanCollection
   const info = data.info || {}
 
-  const collection: Collection = {
+  return {
     id: crypto.randomUUID(),
     name: info.name || 'Imported Collection',
     description: info.description || undefined,
@@ -20,14 +64,10 @@ export function importPostmanCollection(json: unknown): Collection {
       key: v.key || '',
       value: v.value || '',
     })),
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
   }
-
-  return collection
 }
 
-function parseItems(items: PostmanItem[]): CollectionItem[] {
+function parseItems(items: PostmanItem[]): ImportedCollectionItem[] {
   return items.map((item) => {
     // Folder: has sub-items array (even if empty — empty folders are valid)
     if (item.item && Array.isArray(item.item)) {
@@ -49,16 +89,17 @@ function parseItems(items: PostmanItem[]): CollectionItem[] {
   })
 }
 
-function parseRequest(req: PostmanRequest | undefined): RequestConfig {
+function parseRequest(req: PostmanRequest | undefined): ImportedRequest {
   if (!req) {
     return {
-      id: crypto.randomUUID(),
-      method: HttpMethod.GET,
+      method: 'GET',
       url: '',
       headers: [],
       params: [],
-      body: { type: 'none' },
+      body: { type: 'none', content: '' },
       auth: { type: 'none' },
+      preRequest: '',
+      tests: '',
     }
   }
 
@@ -70,13 +111,14 @@ function parseRequest(req: PostmanRequest | undefined): RequestConfig {
   const auth = parseAuth(req.auth)
 
   return {
-    id: crypto.randomUUID(),
-    method: Object.values(HttpMethod).includes(method) ? method : HttpMethod.GET,
+    method: HTTP_METHODS.includes(method) ? method : 'GET',
     url,
     headers,
     params,
     body,
     auth,
+    preRequest: '',
+    tests: '',
   }
 }
 
@@ -91,7 +133,7 @@ function parseUrl(url: PostmanUrl | string | undefined): string {
   return `${protocol}://${host}${path}`
 }
 
-function parseParams(url: PostmanUrl | string | undefined): KeyValuePair[] {
+function parseParams(url: PostmanUrl | string | undefined): { key: string; value: string; enabled: boolean }[] {
   if (!url || typeof url === 'string') {
     // Parse from query string
     if (typeof url === 'string' && url.includes('?')) {
@@ -99,7 +141,6 @@ function parseParams(url: PostmanUrl | string | undefined): KeyValuePair[] {
       return queryStr.split('&').map((pair) => {
         const [key, value] = pair.split('=')
         return {
-          id: crypto.randomUUID(),
           key: decodeURIComponent(key || ''),
           value: decodeURIComponent(value || ''),
           enabled: true,
@@ -109,40 +150,38 @@ function parseParams(url: PostmanUrl | string | undefined): KeyValuePair[] {
     return []
   }
   return (url.query || []).map((q: PostmanQueryParam) => ({
-    id: crypto.randomUUID(),
     key: q.key || '',
     value: q.value || '',
     enabled: !q.disabled,
   }))
 }
 
-function parseHeaders(headers: PostmanHeader[] | undefined): KeyValuePair[] {
+function parseHeaders(headers: PostmanHeader[] | undefined): { key: string; value: string; enabled: boolean }[] {
   if (!headers) return []
   return headers.map((h) => ({
-    id: crypto.randomUUID(),
     key: h.key || '',
     value: h.value || '',
     enabled: !h.disabled,
   }))
 }
 
-function parseBody(body: PostmanBody | undefined): RequestBody {
-  if (!body || body.mode === 'none') return { type: 'none' }
+function parseBody(body: PostmanBody | undefined): ImportedRequestBody {
+  if (!body || body.mode === 'none') return { type: 'none', content: '' }
 
   if (body.mode === 'raw') {
     const lang = body.options?.raw?.language || ''
     const isJson = lang === 'json' || (body.raw || '').trim().startsWith('{')
     return {
-      type: isJson ? 'json' : 'raw',
-      raw: body.raw || '',
+      type: isJson ? 'json' : 'text',
+      content: body.raw || '',
     }
   }
 
   if (body.mode === 'urlencoded') {
     return {
-      type: 'x-www-form-urlencoded',
-      urlencoded: (body.urlencoded || []).map((p: PostmanUrlencoded) => ({
-        id: crypto.randomUUID(),
+      type: 'urlencoded',
+      content: '',
+      formData: (body.urlencoded || []).map((p: PostmanUrlencoded) => ({
         key: p.key || '',
         value: p.value || '',
         enabled: !p.disabled,
@@ -151,21 +190,20 @@ function parseBody(body: PostmanBody | undefined): RequestBody {
   }
 
   if (body.mode === 'formdata') {
-    const fields: FormDataField[] = (body.formdata || []).map((f: PostmanFormdata) => ({
-      id: crypto.randomUUID(),
+    const fields = (body.formdata || []).map((f: PostmanFormdata) => ({
       key: f.key || '',
       value: f.value || f.src || '',
       enabled: !f.disabled,
       fieldType: f.type === 'file' ? 'file' as const : 'text' as const,
       fileName: f.src ? f.src.split('/').pop() : undefined,
     }))
-    return { type: 'form-data', formData: fields }
+    return { type: 'formdata', content: '', formData: fields }
   }
 
-  return { type: 'none' }
+  return { type: 'none', content: '' }
 }
 
-function parseAuth(auth: PostmanAuth | undefined): AuthConfig {
+function parseAuth(auth: PostmanAuth | undefined): ImportedRequestAuth {
   if (!auth || auth.type === 'noauth') return { type: 'none' }
 
   if (auth.type === 'bearer') {
@@ -183,7 +221,7 @@ function parseAuth(auth: PostmanAuth | undefined): AuthConfig {
     const key = findAuthValue(auth.apikey, 'key')
     const value = findAuthValue(auth.apikey, 'value')
     const addTo = findAuthValue(auth.apikey, 'in') === 'query' ? 'query' : 'header'
-    return { type: 'api-key', apiKey: { key, value, addTo } }
+    return { type: 'apikey', apiKey: { key, value, in: addTo } }
   }
 
   return { type: 'none' }

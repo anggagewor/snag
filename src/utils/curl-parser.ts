@@ -1,16 +1,23 @@
-import { HttpMethod } from '@/types/common'
-import type { KeyValuePair } from '@/types/common'
-import type { RequestConfig, AuthConfig } from '@/types/request'
-import { createEmptyRequest } from '@/types/request'
+import type { HttpMethod } from '@/domain'
+import type { RequestDraft, KeyValuePairEditable, RequestAuthDraft } from '@/domain'
+
+const HTTP_METHODS: HttpMethod[] = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS']
+
+function createEditableKv(key: string, value: string, enabled = true): KeyValuePairEditable {
+  return {
+    id: crypto.randomUUID(),
+    key,
+    value,
+    enabled,
+  }
+}
 
 /**
- * Parse a cURL command string into a RequestConfig object.
+ * Parse a cURL command string into a RequestDraft object.
  * Handles: method (-X), URL, headers (-H), data/body (-d, --data, --data-raw),
  * auth (--user / -u for basic auth).
  */
-export function parseCurl(input: string): RequestConfig {
-  const request = createEmptyRequest()
-
+export function parseCurl(input: string): RequestDraft {
   // Normalize multiline curl (backslash continuations)
   const normalized = input.replace(/\\\n/g, ' ').replace(/\\\r\n/g, ' ').trim()
 
@@ -18,9 +25,9 @@ export function parseCurl(input: string): RequestConfig {
 
   let method: HttpMethod | null = null
   let url = ''
-  const headers: KeyValuePair[] = []
+  const headers: KeyValuePairEditable[] = []
   let body = ''
-  let auth: AuthConfig = { type: 'none' }
+  let auth: RequestAuthDraft = { type: 'none' }
 
   let i = 0
   while (i < tokens.length) {
@@ -35,7 +42,7 @@ export function parseCurl(input: string): RequestConfig {
       i++
       if (i < tokens.length) {
         const m = tokens[i].toUpperCase() as HttpMethod
-        if (Object.values(HttpMethod).includes(m)) {
+        if (HTTP_METHODS.includes(m)) {
           method = m
         }
       }
@@ -49,12 +56,10 @@ export function parseCurl(input: string): RequestConfig {
         const headerStr = tokens[i]
         const colonIdx = headerStr.indexOf(':')
         if (colonIdx > 0) {
-          headers.push({
-            id: crypto.randomUUID(),
-            key: headerStr.slice(0, colonIdx).trim(),
-            value: headerStr.slice(colonIdx + 1).trim(),
-            enabled: true,
-          })
+          headers.push(createEditableKv(
+            headerStr.slice(0, colonIdx).trim(),
+            headerStr.slice(colonIdx + 1).trim(),
+          ))
         }
       }
       i++
@@ -111,24 +116,26 @@ export function parseCurl(input: string): RequestConfig {
 
   // Infer method from body presence
   if (!method) {
-    method = body ? HttpMethod.POST : HttpMethod.GET
+    method = body ? 'POST' : 'GET'
   }
 
-  request.method = method
-  request.url = url
-  request.headers = headers
-  request.auth = auth
+  // Detect if body is JSON
+  const isJson = body.trim().startsWith('{') || body.trim().startsWith('[')
 
-  if (body) {
-    // Detect if body is JSON
-    const isJson = body.trim().startsWith('{') || body.trim().startsWith('[')
-    request.body = {
-      type: isJson ? 'json' : 'raw',
-      raw: body,
-    }
+  return {
+    name: 'Imported from cURL',
+    protocol: 'rest',
+    method,
+    url,
+    headers,
+    params: [],
+    body: body
+      ? { type: isJson ? 'json' : 'text', content: body }
+      : { type: 'none', content: '' },
+    auth,
+    preRequest: '',
+    tests: '',
   }
-
-  return request
 }
 
 /**

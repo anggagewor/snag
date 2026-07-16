@@ -1,13 +1,13 @@
-import { HttpMethod } from '@/types/common'
-import type { KeyValuePair } from '@/types/common'
-import type { Collection, CollectionItem } from '@/types/collection'
-import type { RequestConfig, RequestBody, AuthConfig } from '@/types/request'
+import type { HttpMethod } from '@/domain'
+import type { ImportedCollection, ImportedCollectionItem, ImportedRequest, ImportedRequestBody, ImportedRequestAuth } from '@/utils/import-postman'
+
+const HTTP_METHODS: HttpMethod[] = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS']
 
 /**
  * Import an OpenAPI 3.x / Swagger 2.x spec into a Snag Collection.
  * Creates folders per tag (or per path prefix), with requests for each operation.
  */
-export function importOpenApiSpec(json: unknown): Collection {
+export function importOpenApiSpec(json: unknown): ImportedCollection {
   const spec = json as OpenApiSpec
 
   const isV3 = spec.openapi?.startsWith('3')
@@ -26,8 +26,6 @@ export function importOpenApiSpec(json: unknown): Collection {
     variables: baseUrl
       ? [{ key: 'baseUrl', value: baseUrl }]
       : undefined,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
   }
 }
 
@@ -46,10 +44,10 @@ function resolveBaseUrl(spec: OpenApiSpec): string {
   return ''
 }
 
-function parsePathsToItems(spec: OpenApiSpec, baseUrl: string): CollectionItem[] {
+function parsePathsToItems(spec: OpenApiSpec, baseUrl: string): ImportedCollectionItem[] {
   const paths = spec.paths || {}
-  const taggedFolders: Record<string, CollectionItem[]> = {}
-  const untagged: CollectionItem[] = []
+  const taggedFolders: Record<string, ImportedCollectionItem[]> = {}
+  const untagged: ImportedCollectionItem[] = []
 
   for (const [path, methods] of Object.entries(paths)) {
     if (!methods) continue
@@ -71,7 +69,7 @@ function parsePathsToItems(spec: OpenApiSpec, baseUrl: string): CollectionItem[]
     }
   }
 
-  const items: CollectionItem[] = []
+  const items: ImportedCollectionItem[] = []
 
   // Create folders for tags
   for (const [tag, requests] of Object.entries(taggedFolders)) {
@@ -95,7 +93,7 @@ function createRequestItem(
   operation: OpenApiOperation,
   baseUrl: string,
   spec: OpenApiSpec
-): CollectionItem {
+): ImportedCollectionItem {
   const httpMethod = method.toUpperCase() as HttpMethod
   const name = operation.summary || operation.operationId || `${method.toUpperCase()} ${path}`
 
@@ -103,8 +101,8 @@ function createRequestItem(
   const url = baseUrl ? `{{baseUrl}}${path}` : path
 
   // Parse parameters
-  const params: KeyValuePair[] = []
-  const headers: KeyValuePair[] = []
+  const params: { key: string; value: string; enabled: boolean }[] = []
+  const headers: { key: string; value: string; enabled: boolean }[] = []
   const pathParams: { key: string; value: string }[] = []
 
   for (const param of operation.parameters || []) {
@@ -113,14 +111,12 @@ function createRequestItem(
 
     if (resolved.in === 'query') {
       params.push({
-        id: crypto.randomUUID(),
         key: resolved.name,
         value: String(resolved.example || resolved.schema?.example || ''),
         enabled: resolved.required || false,
       })
     } else if (resolved.in === 'header') {
       headers.push({
-        id: crypto.randomUUID(),
         key: resolved.name,
         value: String(resolved.example || resolved.schema?.example || ''),
         enabled: true,
@@ -142,14 +138,15 @@ function createRequestItem(
     finalUrl = finalUrl.replace(`{${pp.key}}`, `{{${pp.key}}}`)
   }
 
-  const request: RequestConfig = {
-    id: crypto.randomUUID(),
-    method: Object.values(HttpMethod).includes(httpMethod) ? httpMethod : HttpMethod.GET,
+  const request: ImportedRequest = {
+    method: HTTP_METHODS.includes(httpMethod) ? httpMethod : 'GET',
     url: finalUrl,
     headers,
     params,
     body,
     auth,
+    preRequest: '',
+    tests: '',
   }
 
   return {
@@ -160,8 +157,8 @@ function createRequestItem(
   }
 }
 
-function parseRequestBody(reqBody: OpenApiRequestBody | undefined, spec: OpenApiSpec): RequestBody {
-  if (!reqBody) return { type: 'none' }
+function parseRequestBody(reqBody: OpenApiRequestBody | undefined, spec: OpenApiSpec): ImportedRequestBody {
+  if (!reqBody) return { type: 'none', content: '' }
 
   // Resolve $ref
   if (reqBody.$ref) {
@@ -177,34 +174,34 @@ function parseRequestBody(reqBody: OpenApiRequestBody | undefined, spec: OpenApi
     const raw = example
       ? JSON.stringify(example, null, 2)
       : schema ? generateExampleFromSchema(schema, spec) : ''
-    return { type: 'json', raw }
+    return { type: 'json', content: raw }
   }
 
   if (content['application/x-www-form-urlencoded']) {
     const schema = content['application/x-www-form-urlencoded'].schema
     const fields = schemaToKeyValuePairs(schema, spec)
-    return { type: 'x-www-form-urlencoded', urlencoded: fields }
+    return { type: 'urlencoded', content: '', formData: fields }
   }
 
   if (content['multipart/form-data']) {
     const schema = content['multipart/form-data'].schema
     const fields = schemaToFormDataFields(schema, spec)
-    return { type: 'form-data', formData: fields }
+    return { type: 'formdata', content: '', formData: fields }
   }
 
   // Fallback: raw
   const firstType = Object.keys(content)[0]
   if (firstType) {
-    return { type: 'raw', raw: '' }
+    return { type: 'text', content: '' }
   }
 
-  return { type: 'none' }
+  return { type: 'none', content: '' }
 }
 
 function parseSecurityToAuth(
   security: OpenApiSecurity[] | undefined,
   spec: OpenApiSpec
-): AuthConfig {
+): ImportedRequestAuth {
   if (!security || security.length === 0) return { type: 'none' }
 
   const schemes = spec.components?.securitySchemes || (spec as SwaggerSpec).securityDefinitions || {}
@@ -222,11 +219,11 @@ function parseSecurityToAuth(
   }
   if (scheme.type === 'apiKey') {
     return {
-      type: 'api-key',
+      type: 'apikey',
       apiKey: {
         key: scheme.name || 'X-API-Key',
         value: '',
-        addTo: scheme.in === 'query' ? 'query' : 'header',
+        in: scheme.in === 'query' ? 'query' : 'header',
       },
     }
   }
@@ -290,12 +287,11 @@ function schemaToExample(schema: OpenApiSchema, spec: OpenApiSpec, depth: number
   return null
 }
 
-function schemaToKeyValuePairs(schema: OpenApiSchema | undefined, _spec: OpenApiSpec): KeyValuePair[] {
+function schemaToKeyValuePairs(schema: OpenApiSchema | undefined, _spec: OpenApiSpec): { key: string; value: string; enabled: boolean }[] {
   if (!schema || !schema.properties) return []
   return Object.entries(schema.properties).map(([key, prop]) => {
     const p = prop as OpenApiSchema
     return {
-      id: crypto.randomUUID(),
       key,
       value: p.example?.toString() || '',
       enabled: true,
@@ -303,13 +299,12 @@ function schemaToKeyValuePairs(schema: OpenApiSchema | undefined, _spec: OpenApi
   })
 }
 
-function schemaToFormDataFields(schema: OpenApiSchema | undefined, _spec: OpenApiSpec): import('@/types/request').FormDataField[] {
+function schemaToFormDataFields(schema: OpenApiSchema | undefined, _spec: OpenApiSpec): { key: string; value: string; enabled: boolean; fieldType?: 'text' | 'file' }[] {
   if (!schema || !schema.properties) return []
   return Object.entries(schema.properties).map(([key, prop]) => {
     const p = prop as OpenApiSchema
     const isFile = p.type === 'string' && p.format === 'binary'
     return {
-      id: crypto.randomUUID(),
       key,
       value: isFile ? '' : (p.example?.toString() || ''),
       enabled: true,

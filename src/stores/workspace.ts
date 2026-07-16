@@ -147,6 +147,32 @@ export const useWorkspaceStore = defineStore('workspace', () => {
     isReady.value = false
   }
 
+  async function switchWorkspace(path: string): Promise<void> {
+    isLoading.value = true
+    try {
+      // 1. Close current workspace
+      await closeWorkspace()
+
+      // 2. Clear all tabs
+      const { useTabsStore } = await import('@/stores/tabs')
+      const tabsStore = useTabsStore()
+      tabsStore.clearAllTabs()
+
+      // 3. Open new workspace
+      await openWorkspace(path)
+
+      // 4. Reload workspace settings
+      const { useSettingsStore } = await import('@/stores/settings')
+      const settingsStore = useSettingsStore()
+      await settingsStore.reloadWorkspaceSettings()
+    } catch (err) {
+      console.error('[workspaceStore] Workspace switch failed:', err)
+      throw err
+    } finally {
+      isLoading.value = false
+    }
+  }
+
   // ─── Collections ───────────────────────────────────────────────
 
   async function createCollection(name: string): Promise<Collection> {
@@ -377,6 +403,7 @@ export const useWorkspaceStore = defineStore('workspace', () => {
     openWorkspace,
     createWorkspace,
     closeWorkspace,
+    switchWorkspace,
 
     // Collections
     createCollection,

@@ -11,11 +11,12 @@ export function useKeyboard() {
 
   async function handleSendRequest() {
     const tab = tabsStore.activeTab
-    if (!tab || tab.type !== 'request' || !tab.request?.url) return
+    if (!tab || tab.type !== 'request' || !tab.requestDraft?.url) return
 
-    const response = await sendRequest(tab.request, tab.collectionVariables)
+    const draft = tab.requestDraft
+    const response = await sendRequest(draft, tab.collectionVariables)
     tabsStore.updateTabResponse(tab.id, response)
-    historyStore.addEntry(tab.request, response)
+    historyStore.addEntry(draft, response)
   }
 
   function handleKeyDown(e: KeyboardEvent) {

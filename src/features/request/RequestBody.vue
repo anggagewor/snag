@@ -4,10 +4,8 @@ import { computed, ref } from 'vue'
 import { AlignLeft, Ban } from 'lucide-vue-next'
 
 import { useTabsStore } from '@/stores/tabs'
-import type { BodyType } from '@/types/request'
 import type { Tab } from '@/stores/tabs'
-import type { KeyValuePair } from '@/types/common'
-import BaseKeyValueEditor from '@/components/base/BaseKeyValueEditor.vue'
+import type { BodyType } from '@/domain'
 import BaseSelect from '@/components/base/BaseSelect.vue'
 import type { SelectOption } from '@/components/base/BaseSelect.vue'
 import BaseCodeEditor from '@/components/base/BaseCodeEditor.vue'
@@ -24,9 +22,10 @@ const tabsStore = useTabsStore()
 const bodyTypes: { label: string; value: BodyType }[] = [
   { label: 'none', value: 'none' },
   { label: 'JSON', value: 'json' },
-  { label: 'Form Data', value: 'form-data' },
-  { label: 'URL Encoded', value: 'x-www-form-urlencoded' },
-  { label: 'Raw', value: 'raw' },
+  { label: 'Form Data', value: 'formdata' },
+  { label: 'URL Encoded', value: 'urlencoded' },
+  { label: 'Text', value: 'text' },
+  { label: 'XML', value: 'xml' },
   { label: 'Binary', value: 'binary' },
 ]
 
@@ -39,41 +38,34 @@ const rawLanguageOptions: SelectOption[] = [
 
 const rawLanguage = ref<EditorLanguage>('text')
 
-const currentBody = computed(() => props.tab.request?.body)
+const currentBody = computed(() => props.tab.requestDraft?.body)
 
 function setBodyType(type: BodyType) {
-  const body = { ...props.tab.request!.body, type }
+  if (!props.tab.requestDraft) return
+  const body = props.tab.requestDraft.body
+  body.type = type
   // Initialize sub-fields if needed
-  if (type === 'form-data' && !body.formData) {
+  if ((type === 'formdata' || type === 'urlencoded') && !body.formData) {
     body.formData = []
   }
-  if (type === 'x-www-form-urlencoded' && !body.urlencoded) {
-    body.urlencoded = []
+  if ((type === 'json' || type === 'text' || type === 'xml') && body.content === undefined) {
+    body.content = ''
   }
-  if ((type === 'json' || type === 'raw') && body.raw === undefined) {
-    body.raw = ''
-  }
-  tabsStore.updateTabRequest(props.tab.id, { body })
+  tabsStore.recomputeDirty(props.tab.id)
 }
 
-function updateRawBody(value: string) {
-  tabsStore.updateTabRequest(props.tab.id, {
-    body: { ...props.tab.request!.body, raw: value },
-  })
-}
-
-function updateUrlEncoded(value: KeyValuePair[]) {
-  tabsStore.updateTabRequest(props.tab.id, {
-    body: { ...props.tab.request!.body, urlencoded: value },
-  })
+function updateContent(value: string) {
+  if (!props.tab.requestDraft) return
+  props.tab.requestDraft.body.content = value
+  tabsStore.recomputeDirty(props.tab.id)
 }
 
 function formatJson() {
-  const raw = currentBody.value?.raw
-  if (!raw) return
+  const content = currentBody.value?.content
+  if (!content) return
   try {
-    const formatted = JSON.stringify(JSON.parse(raw), null, 2)
-    updateRawBody(formatted)
+    const formatted = JSON.stringify(JSON.parse(content), null, 2)
+    updateContent(formatted)
   } catch {
     // invalid JSON, do nothing
   }
@@ -96,8 +88,8 @@ function formatJson() {
         {{ bt.label }}
       </button>
 
-      <!-- Raw language selector -->
-      <div v-if="currentBody?.type === 'raw'" class="ml-auto w-[120px]">
+      <!-- Raw language selector (for text type) -->
+      <div v-if="currentBody?.type === 'text'" class="ml-auto w-[120px]">
         <BaseSelect
           v-model="rawLanguage"
           :options="rawLanguageOptions"
@@ -131,36 +123,41 @@ function formatJson() {
       <!-- JSON editor -->
       <div v-else-if="currentBody?.type === 'json'" class="h-full flex flex-col">
         <BaseCodeEditor
-          :model-value="currentBody?.raw || ''"
+          :model-value="currentBody?.content || ''"
           language="json"
           placeholder='{ "key": "value" }'
-          @update:model-value="updateRawBody"
+          @update:model-value="updateContent"
         />
       </div>
 
-      <!-- Raw editor -->
-      <div v-else-if="currentBody?.type === 'raw'" class="h-full">
+      <!-- Text editor -->
+      <div v-else-if="currentBody?.type === 'text'" class="h-full">
         <BaseCodeEditor
-          :model-value="currentBody?.raw || ''"
+          :model-value="currentBody?.content || ''"
           :language="rawLanguage"
-          placeholder="Enter raw body content..."
-          @update:model-value="updateRawBody"
+          placeholder="Enter body content..."
+          @update:model-value="updateContent"
+        />
+      </div>
+
+      <!-- XML editor -->
+      <div v-else-if="currentBody?.type === 'xml'" class="h-full">
+        <BaseCodeEditor
+          :model-value="currentBody?.content || ''"
+          language="xml"
+          placeholder="Enter XML body..."
+          @update:model-value="updateContent"
         />
       </div>
 
       <!-- Form Data -->
-      <div v-else-if="currentBody?.type === 'form-data'">
+      <div v-else-if="currentBody?.type === 'formdata'">
         <RequestFormData :tab="tab" />
       </div>
 
-      <!-- URL Encoded -->
-      <div v-else-if="currentBody?.type === 'x-www-form-urlencoded'">
-        <BaseKeyValueEditor
-          :model-value="currentBody?.urlencoded || []"
-          key-placeholder="Field name"
-          value-placeholder="Field value"
-          @update:model-value="updateUrlEncoded"
-        />
+      <!-- URL Encoded (uses same form data editor) -->
+      <div v-else-if="currentBody?.type === 'urlencoded'">
+        <RequestFormData :tab="tab" />
       </div>
 
       <!-- Binary -->

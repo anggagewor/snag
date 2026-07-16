@@ -1,10 +1,13 @@
-import type { RequestConfig } from '@/types/request'
+import type { Request, RequestDraft } from '@/domain'
+
+/** Input type for curl export — accepts either immutable Request or mutable RequestDraft */
+type CurlExportInput = Request | RequestDraft
 
 /**
- * Generate a cURL command string from a RequestConfig.
+ * Generate a cURL command string from a Request or RequestDraft.
  * Variables are NOT resolved — the raw template is exported.
  */
-export function exportToCurl(request: RequestConfig): string {
+export function exportToCurl(request: CurlExportInput): string {
   const parts: string[] = ['curl']
 
   // Method (skip for GET as it's the default)
@@ -26,8 +29,8 @@ export function exportToCurl(request: RequestConfig): string {
     parts.push(`-H 'Authorization: Bearer ${escapeShell(request.auth.bearer.token)}'`)
   } else if (request.auth.type === 'basic' && request.auth.basic) {
     parts.push(`-u '${escapeShell(request.auth.basic.username)}:${escapeShell(request.auth.basic.password)}'`)
-  } else if (request.auth.type === 'api-key' && request.auth.apiKey) {
-    if (request.auth.apiKey.addTo === 'header') {
+  } else if (request.auth.type === 'apikey' && request.auth.apiKey) {
+    if (request.auth.apiKey.in === 'header') {
       parts.push(`-H '${escapeShell(request.auth.apiKey.key)}: ${escapeShell(request.auth.apiKey.value)}'`)
     }
   }
@@ -45,29 +48,25 @@ export function exportToCurl(request: RequestConfig): string {
 
   // Body
   const { body } = request
-  if (body.type === 'json' && body.raw) {
+  if (body.type === 'json' && body.content) {
     parts.push(`-H 'Content-Type: application/json'`)
-    parts.push(`-d '${escapeShell(body.raw)}'`)
-  } else if (body.type === 'raw' && body.raw) {
-    parts.push(`-d '${escapeShell(body.raw)}'`)
-  } else if (body.type === 'x-www-form-urlencoded' && body.urlencoded) {
+    parts.push(`-d '${escapeShell(body.content)}'`)
+  } else if ((body.type === 'text' || body.type === 'xml' || body.type === 'graphql') && body.content) {
+    parts.push(`-d '${escapeShell(body.content)}'`)
+  } else if (body.type === 'urlencoded' && body.formData) {
     parts.push(`-H 'Content-Type: application/x-www-form-urlencoded'`)
-    const data = body.urlencoded
+    const data = body.formData
       .filter((p) => p.enabled && p.key)
       .map((p) => `${encodeURIComponent(p.key)}=${encodeURIComponent(p.value)}`)
       .join('&')
     if (data) parts.push(`-d '${escapeShell(data)}'`)
-  } else if (body.type === 'form-data' && body.formData) {
+  } else if (body.type === 'formdata' && body.formData) {
     for (const field of body.formData) {
       if (!field.enabled || !field.key) continue
-      if (field.fieldType === 'file') {
-        parts.push(`-F '${escapeShell(field.key)}=@${escapeShell(field.value)}'`)
-      } else {
-        parts.push(`-F '${escapeShell(field.key)}=${escapeShell(field.value)}'`)
-      }
+      parts.push(`-F '${escapeShell(field.key)}=${escapeShell(field.value)}'`)
     }
-  } else if (body.type === 'binary' && body.binary) {
-    parts.push(`--data-binary '@${escapeShell(body.binary)}'`)
+  } else if (body.type === 'binary' && body.binaryPath) {
+    parts.push(`--data-binary '@${escapeShell(body.binaryPath)}'`)
   }
 
   return parts.join(' \\\n  ')

@@ -16,7 +16,7 @@ import SearchPalette from '@/features/search/SearchPalette.vue'
 import type { StartupResult } from '@/services/startup'
 
 // Initialize theme
-const { loadTheme } = useTheme()
+const { loadFromSettings } = useTheme()
 
 // Register keyboard shortcuts
 useKeyboard()
@@ -58,8 +58,10 @@ onMounted(async () => {
     historyStore.load(),
     settingsStore.load(),
     tabsStore.load(),
-    loadTheme(),
   ])
+
+  // Sync theme from settings store
+  loadFromSettings(settingsStore.resolved.theme)
 
   // Open workspace (handles collections + environments via new architecture)
   if (startupResult) {

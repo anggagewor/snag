@@ -125,10 +125,15 @@ async function handleImport() {
               url: item.request.url || '',
               headers: (item.request.headers || []).map((h: any) => ({ key: h.key, value: h.value, enabled: h.enabled ?? true })),
               params: (item.request.params || []).map((p: any) => ({ key: p.key, value: p.value, enabled: p.enabled ?? true })),
-              body: { type: 'none' as const, content: item.request.body?.raw || '' },
-              auth: { type: 'none' as const },
-              preRequest: item.request.preRequestScript || '',
-              tests: item.request.testScript || '',
+              body: {
+                type: (item.request.body?.type || 'none') as any,
+                content: item.request.body?.content || '',
+                ...(item.request.body?.formData && { formData: item.request.body.formData.map((f: any) => ({ key: f.key, value: f.value, enabled: f.enabled ?? true })) }),
+                ...(item.request.body?.binaryPath && { binaryPath: item.request.body.binaryPath }),
+              },
+              auth: item.request.auth || { type: 'none' as const },
+              preRequest: item.request.preRequest || '',
+              tests: item.request.tests || '',
             }
             await workspaceStore.saveRequest(updated)
           }

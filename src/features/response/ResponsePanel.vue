@@ -3,7 +3,7 @@ import { ref, computed } from 'vue'
 
 import { Loader2, AlertTriangle, Zap, Clock, Database, Copy } from 'lucide-vue-next'
 
-import type { RequestConfig, ResponseData } from '@/types/request'
+import type { ResponseData } from '@/domain'
 import { formatBytes } from '@/utils/formatters'
 import BaseBadge from '@/components/base/BaseBadge.vue'
 import BaseCodeEditor from '@/components/base/BaseCodeEditor.vue'
@@ -11,7 +11,6 @@ import type { EditorLanguage } from '@/components/base/BaseCodeEditor.vue'
 
 const props = defineProps<{
   response?: ResponseData | null
-  request?: RequestConfig | null
   isLoading?: boolean
   error?: string | null
 }>()

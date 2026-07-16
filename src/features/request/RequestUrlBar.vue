@@ -1,10 +1,9 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 
-import { HttpMethod, ProtocolType } from '@/types/common'
 import { useWorkspaceStore } from '@/stores/workspace'
 import { useTabsStore } from '@/stores/tabs'
-import type { RequestConfig } from '@/types/request'
+import type { HttpMethod, ProtocolType, RequestDraft } from '@/domain'
 import BaseButton from '@/components/base/BaseButton.vue'
 import BaseSelect from '@/components/base/BaseSelect.vue'
 import type { SelectOption } from '@/components/base/BaseSelect.vue'
@@ -12,7 +11,7 @@ import BaseUrlInput from '@/components/base/BaseUrlInput.vue'
 import { parseCurl } from '@/utils/curl-parser'
 
 const props = defineProps<{
-  request: RequestConfig
+  request: RequestDraft
   isLoading?: boolean
   protocol?: ProtocolType
 }>()
@@ -29,39 +28,30 @@ const tabsStore = useTabsStore()
 const workspaceStore = useWorkspaceStore()
 
 const protocolOptions: SelectOption[] = [
-  { label: 'REST', value: ProtocolType.REST, color: '#10b981' },
-  { label: 'WS', value: ProtocolType.WEBSOCKET, color: '#f59e0b' },
-  { label: 'GQL', value: ProtocolType.GRAPHQL, color: '#e535ab' },
-  { label: 'gRPC', value: ProtocolType.GRPC, color: '#3b82f6' },
+  { label: 'REST', value: 'rest', color: '#10b981' },
+  { label: 'WS', value: 'websocket', color: '#f59e0b' },
+  { label: 'GQL', value: 'graphql', color: '#e535ab' },
+  { label: 'gRPC', value: 'grpc', color: '#3b82f6' },
 ]
 
-const currentProtocol = computed(() => props.protocol || ProtocolType.REST)
+const currentProtocol = computed(() => props.protocol || 'rest')
 
 const methodOptions: SelectOption[] = [
-  { label: 'GET', value: HttpMethod.GET, color: '#10b981' },
-  { label: 'POST', value: HttpMethod.POST, color: '#f59e0b' },
-  { label: 'PUT', value: HttpMethod.PUT, color: '#3b82f6' },
-  { label: 'PATCH', value: HttpMethod.PATCH, color: '#8b5cf6' },
-  { label: 'DELETE', value: HttpMethod.DELETE, color: '#ef4444' },
-  { label: 'HEAD', value: HttpMethod.HEAD, color: '#6b7280' },
-  { label: 'OPTIONS', value: HttpMethod.OPTIONS, color: '#ec4899' },
+  { label: 'GET', value: 'GET', color: '#10b981' },
+  { label: 'POST', value: 'POST', color: '#f59e0b' },
+  { label: 'PUT', value: 'PUT', color: '#3b82f6' },
+  { label: 'PATCH', value: 'PATCH', color: '#8b5cf6' },
+  { label: 'DELETE', value: 'DELETE', color: '#ef4444' },
+  { label: 'HEAD', value: 'HEAD', color: '#6b7280' },
+  { label: 'OPTIONS', value: 'OPTIONS', color: '#ec4899' },
 ]
 
 const currentMethod = computed(() => props.request.method)
 
-// Resolved URL preview (includes env vars + path params)
+// Resolved URL preview (includes env vars)
 const resolvedUrl = computed(() => {
   if (!props.request.url) return ''
-  let url = workspaceStore.resolveVariablesInString(props.request.url)
-  // Also resolve path params for preview
-  const pathParams = props.request.pathParams || []
-  for (const param of pathParams) {
-    if (param.value) {
-      const resolvedValue = workspaceStore.resolveVariablesInString(param.value)
-      url = url.replace(new RegExp(`:${param.key}\\b`, 'g'), resolvedValue)
-    }
-  }
-  return url
+  return workspaceStore.resolveVariablesInString(props.request.url)
 })
 
 const hasUnresolvedVars = computed(() => {
@@ -84,38 +74,38 @@ function onPaste(e: ClipboardEvent) {
     e.preventDefault()
     const parsed = parseCurl(text)
     const activeTab = tabsStore.activeTab
-    if (activeTab) {
-      tabsStore.updateTabRequest(activeTab.id, {
-        method: parsed.method,
-        url: parsed.url,
-        headers: parsed.headers,
-        body: parsed.body,
-        auth: parsed.auth,
-      })
+    if (activeTab && activeTab.requestDraft) {
+      // parseCurl now returns a RequestDraft — assign fields directly
+      activeTab.requestDraft.method = parsed.method
+      activeTab.requestDraft.url = parsed.url
+      activeTab.requestDraft.headers = parsed.headers
+      activeTab.requestDraft.body = parsed.body
+      activeTab.requestDraft.auth = parsed.auth
+      tabsStore.recomputeDirty(activeTab.id)
     }
-    emit('update:method', parsed.method)
+    emit('update:method', parsed.method as HttpMethod)
     emit('update:url', parsed.url)
   }
 }
 
 const urlPlaceholder = computed(() => {
   switch (currentProtocol.value) {
-    case ProtocolType.WEBSOCKET: return 'ws://localhost:8080/socket'
-    case ProtocolType.GRAPHQL: return 'https://api.example.com/graphql'
-    case ProtocolType.GRPC: return 'localhost:50051'
+    case 'websocket': return 'ws://localhost:8080/socket'
+    case 'graphql': return 'https://api.example.com/graphql'
+    case 'grpc': return 'localhost:50051'
     default: return 'Enter request URL...'
   }
 })
 
 const sendLabel = computed(() => {
   switch (currentProtocol.value) {
-    case ProtocolType.WEBSOCKET: return 'Connect'
-    case ProtocolType.GRAPHQL: return 'Query'
-    case ProtocolType.GRPC: return 'Invoke'
+    case 'websocket': return 'Connect'
+    case 'graphql': return 'Query'
+    case 'grpc': return 'Invoke'
     default: return 'Send'
   }
 })
-const isNotReady = computed(() => currentProtocol.value !== ProtocolType.REST)
+const isNotReady = computed(() => currentProtocol.value !== 'rest')
 </script>
 
 <template>

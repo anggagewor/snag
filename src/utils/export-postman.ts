@@ -1,11 +1,30 @@
-import type { Collection, CollectionItem } from '@/types/collection'
-import type { RequestConfig } from '@/types/request'
-import type { KeyValuePair } from '@/types/common'
+import type { Request, KeyValuePair } from '@/domain'
+
+/**
+ * Collection data shaped for Postman export.
+ * Used as input to the export function — consumers prepare this
+ * from the workspace store data.
+ */
+export interface ExportCollection {
+  id: string
+  name: string
+  description?: string
+  items: ExportCollectionItem[]
+  variables?: { key: string; value: string }[]
+}
+
+export interface ExportCollectionItem {
+  id: string
+  type: 'request' | 'folder'
+  name: string
+  items?: ExportCollectionItem[]
+  request?: Request
+}
 
 /**
  * Export a Snag Collection to Postman Collection v2.1 JSON format.
  */
-export function exportToPostman(collection: Collection): PostmanExport {
+export function exportToPostman(collection: ExportCollection): PostmanExport {
   return {
     info: {
       _postman_id: collection.id,
@@ -22,7 +41,7 @@ export function exportToPostman(collection: Collection): PostmanExport {
   }
 }
 
-function serializeItems(items: CollectionItem[]): PostmanExportItem[] {
+function serializeItems(items: ExportCollectionItem[]): PostmanExportItem[] {
   return items.map((item) => {
     if (item.type === 'folder') {
       return {
@@ -38,9 +57,9 @@ function serializeItems(items: CollectionItem[]): PostmanExportItem[] {
   })
 }
 
-function serializeRequest(req: RequestConfig): PostmanExportRequest {
-  const url = serializeUrl(req.url, req.params)
-  const header = serializeHeaders(req.headers)
+function serializeRequest(req: Request): PostmanExportRequest {
+  const url = serializeUrl(req.url, req.params as KeyValuePair[])
+  const header = serializeHeaders(req.headers as KeyValuePair[])
   const body = serializeBody(req)
   const auth = serializeAuth(req)
 
@@ -78,25 +97,25 @@ function serializeHeaders(headers: KeyValuePair[]): PostmanExportHeader[] {
   }))
 }
 
-function serializeBody(req: RequestConfig): PostmanExportBody | undefined {
+function serializeBody(req: Request): PostmanExportBody | undefined {
   const { body } = req
 
   if (body.type === 'none') return undefined
 
-  if (body.type === 'json' || body.type === 'raw') {
+  if (body.type === 'json' || body.type === 'text' || body.type === 'xml' || body.type === 'graphql') {
     return {
       mode: 'raw',
-      raw: body.raw || '',
+      raw: body.content || '',
       options: body.type === 'json'
         ? { raw: { language: 'json' } }
         : undefined,
     }
   }
 
-  if (body.type === 'x-www-form-urlencoded') {
+  if (body.type === 'urlencoded') {
     return {
       mode: 'urlencoded',
-      urlencoded: (body.urlencoded || []).map((p) => ({
+      urlencoded: (body.formData || []).map((p) => ({
         key: p.key,
         value: p.value,
         disabled: !p.enabled,
@@ -104,14 +123,13 @@ function serializeBody(req: RequestConfig): PostmanExportBody | undefined {
     }
   }
 
-  if (body.type === 'form-data') {
+  if (body.type === 'formdata') {
     return {
       mode: 'formdata',
       formdata: (body.formData || []).map((f) => ({
         key: f.key,
-        value: f.fieldType === 'text' ? f.value : undefined,
-        src: f.fieldType === 'file' ? f.value : undefined,
-        type: f.fieldType,
+        value: f.value,
+        type: 'text',
         disabled: !f.enabled,
       })),
     }
@@ -120,7 +138,7 @@ function serializeBody(req: RequestConfig): PostmanExportBody | undefined {
   return undefined
 }
 
-function serializeAuth(req: RequestConfig): PostmanExportAuth | undefined {
+function serializeAuth(req: Request): PostmanExportAuth | undefined {
   const { auth } = req
 
   if (auth.type === 'none') return { type: 'noauth' }
@@ -142,13 +160,13 @@ function serializeAuth(req: RequestConfig): PostmanExportAuth | undefined {
     }
   }
 
-  if (auth.type === 'api-key' && auth.apiKey) {
+  if (auth.type === 'apikey' && auth.apiKey) {
     return {
       type: 'apikey',
       apikey: [
         { key: 'key', value: auth.apiKey.key, type: 'string' },
         { key: 'value', value: auth.apiKey.value, type: 'string' },
-        { key: 'in', value: auth.apiKey.addTo, type: 'string' },
+        { key: 'in', value: auth.apiKey.in, type: 'string' },
       ],
     }
   }

@@ -5,7 +5,7 @@ import { X } from 'lucide-vue-next'
 
 import { useTabsStore } from '@/stores/tabs'
 import type { Tab } from '@/stores/tabs'
-import type { KeyValuePair } from '@/types/common'
+import type { KeyValuePairEditable } from '@/domain'
 import { STANDARD_HEADERS, HEADER_VALUE_SUGGESTIONS } from '@/utils/http-headers'
 import BaseComboInput from '@/components/base/BaseComboInput.vue'
 import BaseEnvInput from '@/components/base/BaseEnvInput.vue'
@@ -19,7 +19,7 @@ const tabsStore = useTabsStore()
 const viewMode = ref<'table' | 'bulk'>('table')
 
 const headers = computed(() => {
-  const items = props.tab.request?.headers || []
+  const items = props.tab.requestDraft?.headers || []
   if (items.length === 0) {
     return [{ id: crypto.randomUUID(), key: '', value: '', enabled: true }]
   }
@@ -43,12 +43,15 @@ function getValueSuggestions(key: string): string[] {
   return found ? found[1] : []
 }
 
-function sync(updated: KeyValuePair[]) {
+function sync(updated: KeyValuePairEditable[]) {
   const cleaned = updated.filter((item, i) => {
     if (i === updated.length - 1) return true
     return item.key !== '' || item.value !== ''
   })
-  tabsStore.updateTabRequest(props.tab.id, { headers: cleaned })
+  if (props.tab.requestDraft) {
+    props.tab.requestDraft.headers = cleaned
+    tabsStore.recomputeDirty(props.tab.id)
+  }
 }
 
 function updateKey(index: number, value: string) {
@@ -82,7 +85,7 @@ function removeRow(index: number) {
 
 function onBulkChange(e: Event) {
   const text = (e.target as HTMLTextAreaElement).value
-  const pairs: KeyValuePair[] = text
+  const pairs: KeyValuePairEditable[] = text
     .split('\n')
     .filter((line) => line.trim() !== '')
     .map((line) => {
@@ -96,7 +99,10 @@ function onBulkChange(e: Event) {
         enabled: true,
       }
     })
-  tabsStore.updateTabRequest(props.tab.id, { headers: pairs })
+  if (props.tab.requestDraft) {
+    props.tab.requestDraft.headers = pairs
+    tabsStore.recomputeDirty(props.tab.id)
+  }
 }
 </script>
 

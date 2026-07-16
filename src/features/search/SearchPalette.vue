@@ -106,60 +106,11 @@ async function selectResult(result: SearchResult) {
   try {
     const request = await workspaceStore.getRequest(result.requestId as RequestId)
     const sourceId = `${result.collectionId}:${result.requestId}`
-    tabsStore.openRequestTab(
-      {
-        id: request.id,
-        method: request.method as any,
-        url: request.url,
-        headers: request.headers.map(h => ({ id: crypto.randomUUID(), ...h })),
-        params: request.params.map(p => ({ id: crypto.randomUUID(), ...p })),
-        body: {
-          type: mapBodyType(request.body.type),
-          raw: request.body.content || undefined,
-          formData: request.body.formData?.map(f => ({
-            id: crypto.randomUUID(),
-            key: f.key,
-            value: f.value,
-            enabled: f.enabled,
-            fieldType: 'text' as const,
-          })),
-        },
-        auth: {
-          type: mapAuthType(request.auth.type),
-          bearer: request.auth.bearer,
-          basic: request.auth.basic,
-          apiKey: request.auth.apiKey ? {
-            key: request.auth.apiKey.key,
-            value: request.auth.apiKey.value,
-            addTo: request.auth.apiKey.in,
-          } : undefined,
-        },
-        preRequestScript: request.preRequest || undefined,
-        testScript: request.tests || undefined,
-        pathParams: [],
-      },
-      request.name,
-      sourceId,
-    )
+    tabsStore.openRequestTab(result.requestId as RequestId, sourceId, request.name)
   } catch (err) {
     console.error('[SearchPalette] Failed to open request:', err)
   }
   emit('close')
-}
-
-function mapBodyType(type: string): any {
-  const map: Record<string, string> = {
-    none: 'none', json: 'json', xml: 'raw', text: 'raw',
-    formdata: 'form-data', urlencoded: 'x-www-form-urlencoded', binary: 'binary',
-  }
-  return map[type] ?? 'none'
-}
-
-function mapAuthType(type: string): any {
-  const map: Record<string, string> = {
-    none: 'none', basic: 'basic', bearer: 'bearer', apikey: 'api-key',
-  }
-  return map[type] ?? 'none'
 }
 
 function handleKeydown(e: KeyboardEvent) {

@@ -1,90 +1,67 @@
 import { defineStore } from 'pinia'
-import { ref, computed, watch } from 'vue'
+import { ref, computed } from 'vue'
 
 import { useWorkspaceStore } from '@/stores/workspace'
-import { useStorage } from '@/composables/useStorage'
-import { debounce } from '@/utils/debounce'
-import type { UUID } from '@/types/common'
-import { ProtocolType } from '@/types/common'
-import type { RequestConfig, ResponseData } from '@/types/request'
-import type { WebSocketConfig, WebSocketSession } from '@/types/websocket'
-import type { GraphQLConfig, GraphQLResponseData } from '@/types/graphql'
-import type { GrpcConfig, GrpcResponseData } from '@/types/grpc'
-import { createEmptyRequest } from '@/types/request'
-
-const STORAGE_FILE = 'tabs.json'
+import type {
+  RequestId,
+  ProtocolType,
+  RequestDraft,
+  ResponseData,
+  WebSocketConfig,
+  WebSocketSession,
+  GraphQLConfig,
+  GraphQLResponseData,
+  GrpcConfig,
+  GrpcResponseData,
+} from '@/domain'
+import { requestToDraft, draftToRequest, isDirty } from '@/domain'
 
 export interface Tab {
-  id: UUID
-  type: 'request' | 'settings' | 'environments'
+  readonly id: string
+  readonly type: 'request' | 'settings' | 'environments'
   title: string
-  /** Protocol type — defaults to REST */
   protocol: ProtocolType
-  request?: RequestConfig
+  /** Reference to the persisted request (lazy-loaded from workspace) */
+  requestId?: RequestId
+  /** Runtime editing state — mutable working copy of the domain Request */
+  requestDraft?: RequestDraft
+  /** Response from last send (runtime only, not persisted) */
   response?: ResponseData | null
+  /** WebSocket config (future protocol support) */
   websocket?: WebSocketConfig
   websocketSession?: WebSocketSession | null
+  /** GraphQL config (future protocol support) */
   graphql?: GraphQLConfig
   graphqlResponse?: GraphQLResponseData | null
+  /** gRPC config (future protocol support) */
   grpc?: GrpcConfig
   grpcResponse?: GrpcResponseData | null
   isDirty: boolean
+  isError?: boolean
+  errorMessage?: string
   /** Links this tab to a collection item (collectionId:itemId) */
   sourceId?: string
   /** Collection-level variables (resolved from source collection) */
   collectionVariables?: { key: string; value: string }[]
 }
 
-interface TabsSnapshot {
-  tabs: Tab[]
-  activeTabId: UUID | null
-}
-
 export const useTabsStore = defineStore('tabs', () => {
   const tabs = ref<Tab[]>([])
-  const activeTabId = ref<UUID | null>(null)
-  const isLoaded = ref(false)
+  const activeTabId = ref<string | null>(null)
+  const isLoaded = ref(true)
 
-  const { read, write } = useStorage()
+  /** Private snapshot storage: tabId → snapshot of RequestDraft at load/save time */
+  const snapshots = new Map<string, RequestDraft>()
 
   const activeTab = computed(() => tabs.value.find((t) => t.id === activeTabId.value) || null)
   const tabCount = computed(() => tabs.value.length)
 
-  async function persist() {
-    const snapshot: TabsSnapshot = {
-      tabs: tabs.value.map((t) => ({
-        ...t,
-        // Don't persist response data (can be large, stale)
-        response: null,
-      })),
-      activeTabId: activeTabId.value,
-    }
-    await write(STORAGE_FILE, snapshot)
-  }
-
-  const save = debounce(persist, 500)
-
-  async function load() {
-    const data = await read<TabsSnapshot>(STORAGE_FILE, { tabs: [], activeTabId: null })
-    // Backward compat: ensure all tabs have protocol field
-    tabs.value = data.tabs.map((t) => ({
-      ...t,
-      protocol: t.protocol || ProtocolType.REST,
-    }))
-    activeTabId.value = data.activeTabId
-    isLoaded.value = true
-  }
-
-  // Auto-persist on tab changes
-  watch([tabs, activeTabId], () => {
-    if (isLoaded.value) save()
-  }, { deep: true })
-
   /**
-   * Open a request tab. If sourceId is provided and a tab with the same sourceId
-   * already exists, activate that tab instead of creating a new one.
+   * Open a request tab by requestId + sourceId.
+   * Deduplicates by sourceId — if a tab with the same sourceId exists, activates it.
+   * The requestDraft starts as undefined (lazy — call loadTabDraft to populate).
    */
-  function openRequestTab(request?: RequestConfig, title?: string, sourceId?: string) {
+  function openRequestTab(requestId?: RequestId, sourceId?: string, title?: string): Tab {
     // Check if tab with same sourceId is already open
     if (sourceId) {
       const existing = tabs.value.find((t) => t.sourceId === sourceId)
@@ -105,13 +82,24 @@ export const useTabsStore = defineStore('tabs', () => {
       }
     }
 
-    const req = request || createEmptyRequest()
     const tab: Tab = {
       id: crypto.randomUUID(),
       type: 'request',
       title: title || 'Untitled Request',
-      protocol: ProtocolType.REST,
-      request: req,
+      protocol: 'rest',
+      requestId,
+      requestDraft: requestId ? undefined : {
+        name: title || 'Untitled Request',
+        protocol: 'rest',
+        method: 'GET',
+        url: '',
+        headers: [],
+        params: [],
+        body: { type: 'none', content: '' },
+        auth: { type: 'none' },
+        preRequest: '',
+        tests: '',
+      },
       response: null,
       isDirty: false,
       sourceId,
@@ -120,6 +108,81 @@ export const useTabsStore = defineStore('tabs', () => {
     tabs.value.push(tab)
     activeTabId.value = tab.id
     return tab
+  }
+
+  /**
+   * Lazy-load the request draft for a tab.
+   * Loads the domain Request from workspaceStore, converts to RequestDraft,
+   * and stores a snapshot for dirty detection.
+   */
+  async function loadTabDraft(tabId: string): Promise<void> {
+    const tab = tabs.value.find((t) => t.id === tabId)
+    if (!tab || !tab.requestId) return
+
+    const workspaceStore = useWorkspaceStore()
+    try {
+      const request = await workspaceStore.getRequest(tab.requestId)
+      const draft = requestToDraft(request)
+      tab.requestDraft = draft
+      tab.protocol = request.protocol
+      tab.isError = false
+      tab.errorMessage = undefined
+
+      // Store snapshot (deep clone via requestToDraft of the same request)
+      const snapshot = requestToDraft(request)
+      snapshots.set(tabId, snapshot)
+    } catch (err) {
+      tab.isError = true
+      tab.errorMessage = 'Request not found'
+      console.error(`[TabsStore] Failed to load request for tab ${tabId}:`, err)
+    }
+  }
+
+  /**
+   * Save a tab's draft back to disk.
+   * Converts RequestDraft → domain Request via draftToRequest(),
+   * persists via workspaceStore.saveRequest(), updates snapshot, marks clean.
+   */
+  async function saveTab(tabId: string): Promise<boolean> {
+    const tab = tabs.value.find((t) => t.id === tabId)
+    if (!tab || !tab.requestDraft || !tab.requestId) return false
+    if (!tab.isDirty) return true // nothing to save
+
+    const workspaceStore = useWorkspaceStore()
+    try {
+      // Get the original request for its meta (createdAt)
+      const original = await workspaceStore.getRequest(tab.requestId)
+      const request = draftToRequest(tab.requestDraft, tab.requestId, original.meta)
+
+      // Also update the name from tab title
+      const namedRequest = { ...request, name: tab.title }
+      await workspaceStore.saveRequest(namedRequest)
+
+      // Update snapshot and mark clean
+      const newSnapshot = requestToDraft(namedRequest)
+      snapshots.set(tabId, newSnapshot)
+      tab.isDirty = false
+      return true
+    } catch (err) {
+      console.error(`[TabsStore] Failed to save tab ${tabId}:`, err)
+      return false
+    }
+  }
+
+  /**
+   * Recompute dirty state for a tab by comparing current draft to snapshot.
+   */
+  function recomputeDirty(tabId: string): void {
+    const tab = tabs.value.find((t) => t.id === tabId)
+    if (!tab || !tab.requestDraft) return
+
+    const snapshot = snapshots.get(tabId)
+    if (!snapshot) {
+      // No snapshot means tab hasn't been loaded yet — not dirty
+      tab.isDirty = false
+      return
+    }
+    tab.isDirty = isDirty(tab.requestDraft, snapshot)
   }
 
   function openSettingsTab() {
@@ -133,7 +196,7 @@ export const useTabsStore = defineStore('tabs', () => {
       id: crypto.randomUUID(),
       type: 'settings',
       title: 'Settings',
-      protocol: ProtocolType.REST,
+      protocol: 'rest',
       isDirty: false,
     }
     tabs.value.push(tab)
@@ -152,7 +215,7 @@ export const useTabsStore = defineStore('tabs', () => {
       id: crypto.randomUUID(),
       type: 'environments',
       title: 'Environments',
-      protocol: ProtocolType.REST,
+      protocol: 'rest',
       isDirty: false,
     }
     tabs.value.push(tab)
@@ -160,14 +223,14 @@ export const useTabsStore = defineStore('tabs', () => {
     return tab
   }
 
-  function setActiveTab(id: UUID) {
+  function setActiveTab(id: string) {
     activeTabId.value = id
   }
 
   /** Pending tab ID awaiting close confirmation (dirty tab) */
-  const pendingCloseTabId = ref<UUID | null>(null)
+  const pendingCloseTabId = ref<string | null>(null)
 
-  function closeTab(id: UUID) {
+  function closeTab(id: string) {
     const tab = tabs.value.find((t) => t.id === id)
     if (tab && tab.isDirty) {
       pendingCloseTabId.value = id
@@ -176,12 +239,13 @@ export const useTabsStore = defineStore('tabs', () => {
     forceCloseTab(id)
   }
 
-  function forceCloseTab(id: UUID) {
+  function forceCloseTab(id: string) {
     const index = tabs.value.findIndex((t) => t.id === id)
     if (index === -1) return
 
     pendingCloseTabId.value = null
     tabs.value.splice(index, 1)
+    snapshots.delete(id)
 
     if (activeTabId.value === id) {
       if (tabs.value.length > 0) {
@@ -197,37 +261,36 @@ export const useTabsStore = defineStore('tabs', () => {
     pendingCloseTabId.value = null
   }
 
-  function updateTabRequest(id: UUID, request: Partial<RequestConfig>) {
-    const tab = tabs.value.find((t) => t.id === id)
-    if (tab && tab.request) {
-      Object.assign(tab.request, request)
-      tab.isDirty = true
-    }
-  }
-
-  function updateTabResponse(id: UUID, response: ResponseData | null) {
+  function updateTabResponse(id: string, response: ResponseData | null) {
     const tab = tabs.value.find((t) => t.id === id)
     if (tab) {
       tab.response = response
     }
   }
 
-  function updateTabTitle(id: UUID, title: string) {
+  function updateTabTitle(id: string, title: string) {
     const tab = tabs.value.find((t) => t.id === id)
     if (tab) {
       tab.title = title
-      tab.isDirty = true
+      if (tab.requestDraft) {
+        tab.requestDraft.name = title
+        recomputeDirty(id)
+      }
     }
   }
 
-  function markTabClean(id: UUID) {
+  function markTabClean(id: string) {
     const tab = tabs.value.find((t) => t.id === id)
     if (tab) {
       tab.isDirty = false
+      // Update snapshot to current draft state
+      if (tab.requestDraft) {
+        snapshots.set(id, JSON.parse(JSON.stringify(tab.requestDraft)))
+      }
     }
   }
 
-  function linkTabToSource(id: UUID, sourceId: string) {
+  function linkTabToSource(id: string, sourceId: string) {
     const tab = tabs.value.find((t) => t.id === id)
     if (tab) {
       tab.sourceId = sourceId
@@ -236,15 +299,44 @@ export const useTabsStore = defineStore('tabs', () => {
   }
 
   /**
-   * Save current tab back to its source.
-   * NOTE: Actual persistence is handled by TabBar via workspaceStore.
-   * This function now only marks the tab as clean for backward compat.
+   * Clear all tabs (used during workspace switch).
    */
-  function saveTab(id: UUID) {
+  function clearAllTabs() {
+    tabs.value = []
+    activeTabId.value = null
+    snapshots.clear()
+  }
+
+  /**
+   * No-op load — tabs are now transient references, not persisted to a flat file.
+   * Kept for backward compatibility with App.vue startup sequence.
+   */
+  async function load(): Promise<void> {
+    isLoaded.value = true
+  }
+
+  /**
+   * @deprecated Use direct draft mutation + recomputeDirty() instead.
+   * Kept temporarily for UI consumers until task 2.3 migrates them.
+   */
+  function updateTabRequest(id: string, _request: Record<string, unknown>) {
     const tab = tabs.value.find((t) => t.id === id)
-    if (!tab || !tab.request || !tab.sourceId) return false
-    tab.isDirty = false
-    return true
+    if (tab && tab.requestDraft) {
+      // Apply partial updates to the draft
+      const partial = _request as Record<string, unknown>
+
+      if ('method' in partial) tab.requestDraft.method = partial.method as any
+      if ('url' in partial) tab.requestDraft.url = partial.url as string
+      if ('headers' in partial) tab.requestDraft.headers = partial.headers as any
+      if ('params' in partial) tab.requestDraft.params = partial.params as any
+      if ('body' in partial) tab.requestDraft.body = partial.body as any
+      if ('auth' in partial) tab.requestDraft.auth = partial.auth as any
+      if ('preRequest' in partial) tab.requestDraft.preRequest = partial.preRequest as string
+      if ('tests' in partial) tab.requestDraft.tests = partial.tests as string
+      if ('name' in partial) tab.requestDraft.name = partial.name as string
+
+      recomputeDirty(id)
+    }
   }
 
   return {
@@ -256,6 +348,9 @@ export const useTabsStore = defineStore('tabs', () => {
     pendingCloseTabId,
     load,
     openRequestTab,
+    loadTabDraft,
+    saveTab,
+    recomputeDirty,
     openSettingsTab,
     openEnvironmentsTab,
     setActiveTab,
@@ -267,6 +362,6 @@ export const useTabsStore = defineStore('tabs', () => {
     updateTabTitle,
     markTabClean,
     linkTabToSource,
-    saveTab,
+    clearAllTabs,
   }
 })

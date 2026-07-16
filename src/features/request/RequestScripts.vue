@@ -6,6 +6,7 @@ import { CheckCircle, XCircle, Terminal, ChevronDown } from 'lucide-vue-next'
 import { useTabsStore } from '@/stores/tabs'
 import type { Tab } from '@/stores/tabs'
 import type { TestResult } from '@/composables/useScriptRunner'
+
 import BaseCodeEditor from '@/components/base/BaseCodeEditor.vue'
 
 const props = defineProps<{
@@ -18,15 +19,19 @@ const tabsStore = useTabsStore()
 
 const activeScript = ref<'pre-request' | 'test'>('pre-request')
 
-const preRequestScript = computed(() => props.tab.request?.preRequestScript || '')
-const testScript = computed(() => props.tab.request?.testScript || '')
+const preRequestScript = computed(() => props.tab.requestDraft?.preRequest || '')
+const testScript = computed(() => props.tab.requestDraft?.tests || '')
 
 function updatePreRequestScript(value: string) {
-  tabsStore.updateTabRequest(props.tab.id, { preRequestScript: value })
+  if (!props.tab.requestDraft) return
+  props.tab.requestDraft.preRequest = value
+  tabsStore.recomputeDirty(props.tab.id)
 }
 
 function updateTestScript(value: string) {
-  tabsStore.updateTabRequest(props.tab.id, { testScript: value })
+  if (!props.tab.requestDraft) return
+  props.tab.requestDraft.tests = value
+  tabsStore.recomputeDirty(props.tab.id)
 }
 
 const passedTests = computed(() => props.testResults.filter((t) => t.passed).length)

@@ -1,13 +1,10 @@
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
+import { ref, computed } from 'vue'
 
 import { useTabsStore } from '@/stores/tabs'
 import type { Tab } from '@/stores/tabs'
-import type { KeyValuePair } from '@/types/common'
-import type { PathParam } from '@/types/request'
-import { extractPathParams } from '@/types/request'
+import type { KeyValuePairEditable } from '@/domain'
 import BaseKeyValueEditor from '@/components/base/BaseKeyValueEditor.vue'
-import BaseEnvInput from '@/components/base/BaseEnvInput.vue'
 
 const props = defineProps<{
   tab: Tab
@@ -17,32 +14,7 @@ const tabsStore = useTabsStore()
 
 const viewMode = ref<'table' | 'bulk'>('table')
 
-const params = computed(() => props.tab.request?.params || [])
-
-// Reactive path params extracted from URL
-const detectedPathParams = computed(() => {
-  const url = props.tab.request?.url || ''
-  return extractPathParams(url)
-})
-
-const pathParams = computed(() => props.tab.request?.pathParams || [])
-
-// Sync path params when URL changes — add new ones, keep existing values
-watch(detectedPathParams, (detected) => {
-  const existing = props.tab.request?.pathParams || []
-  const updated: PathParam[] = detected.map((key) => {
-    const found = existing.find((p) => p.key === key)
-    return { key, value: found?.value || '' }
-  })
-  tabsStore.updateTabRequest(props.tab.id, { pathParams: updated })
-}, { immediate: true })
-
-function updatePathParamValue(key: string, value: string) {
-  const updated = (props.tab.request?.pathParams || []).map((p) =>
-    p.key === key ? { ...p, value } : p
-  )
-  tabsStore.updateTabRequest(props.tab.id, { pathParams: updated })
-}
+const params = computed(() => props.tab.requestDraft?.params || [])
 
 const bulkText = computed(() => {
   return params.value
@@ -51,13 +23,16 @@ const bulkText = computed(() => {
     .join('\n')
 })
 
-function updateParams(value: KeyValuePair[]) {
-  tabsStore.updateTabRequest(props.tab.id, { params: value })
+function updateParams(value: KeyValuePairEditable[]) {
+  if (props.tab.requestDraft) {
+    props.tab.requestDraft.params = value
+    tabsStore.recomputeDirty(props.tab.id)
+  }
 }
 
 function onBulkChange(e: Event) {
   const text = (e.target as HTMLTextAreaElement).value
-  const pairs: KeyValuePair[] = text
+  const pairs: KeyValuePairEditable[] = text
     .split('\n')
     .filter((line) => line.trim() !== '')
     .map((line) => {
@@ -71,49 +46,17 @@ function onBulkChange(e: Event) {
         enabled: true,
       }
     })
-  tabsStore.updateTabRequest(props.tab.id, { params: pairs })
+  if (props.tab.requestDraft) {
+    props.tab.requestDraft.params = pairs
+    tabsStore.recomputeDirty(props.tab.id)
+  }
 }
 </script>
 
 <template>
   <div>
-    <!-- Path Variables section (only shown when URL has :params) -->
-    <div v-if="detectedPathParams.length > 0" class="mb-4">
-      <div class="flex items-center gap-2 px-1 pb-2">
-        <span class="text-xs font-medium text-muted uppercase tracking-wide">Path Variables</span>
-        <span class="text-[10px] text-muted">(from URL)</span>
-      </div>
-
-      <!-- Path params table -->
-      <div class="border border-border rounded overflow-hidden">
-        <div class="grid grid-cols-[1fr_1fr] gap-0 text-xs text-muted border-b border-border">
-          <span class="px-2 py-1.5">Key</span>
-          <span class="px-2 py-1.5 border-l border-border">Value</span>
-        </div>
-        <div
-          v-for="param in pathParams"
-          :key="param.key"
-          class="grid grid-cols-[1fr_1fr] gap-0 items-center border-b border-border last:border-b-0"
-        >
-          <div class="px-2 py-1.5">
-            <span class="text-xs font-mono text-accent">:{{ param.key }}</span>
-          </div>
-          <div class="border-l border-border h-full flex items-center">
-            <BaseEnvInput
-              :model-value="param.value"
-              :placeholder="`Enter ${param.key}`"
-              monospace
-              size="sm"
-              @update:model-value="updatePathParamValue(param.key, $event)"
-            />
-          </div>
-        </div>
-      </div>
-    </div>
-
     <!-- Query Params header + toggle -->
     <div class="flex items-center justify-between px-1 pb-2">
-      <span v-if="detectedPathParams.length > 0" class="text-xs font-medium text-muted uppercase tracking-wide">Query Parameters</span>
       <div class="flex rounded border border-border overflow-hidden ml-auto">
         <button
           class="px-2 py-0.5 text-[10px] font-medium transition-colors"

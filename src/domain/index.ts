@@ -19,7 +19,7 @@ export type {
   HistoryEntryId,
 } from './ids'
 
-export type { HttpMethod, ProtocolType, KeyValuePair } from './http'
+export type { HttpMethod, ProtocolType, KeyValuePair, ResponseData } from './http'
 
 export type {
   Workspace,
@@ -56,5 +56,29 @@ export type {
   WorkspaceSettings,
   ProxyConfig,
 } from './Settings'
+
+export type {
+  RequestDraft,
+  KeyValuePairEditable,
+  RequestBodyDraft,
+  RequestAuthDraft,
+} from './RequestDraft'
+
+export type {
+  WebSocketConfig,
+  WebSocketMessage,
+  WebSocketSession,
+  GraphQLConfig,
+  GraphQLResponseData,
+  GrpcConfig,
+  GrpcResponseData,
+} from './protocols'
+
+export {
+  requestToDraft,
+  draftToRequest,
+  isDirty,
+  stripEmptyRows,
+} from './RequestDraft'
 
 export { ulid, ulidTimestamp } from './ulid'

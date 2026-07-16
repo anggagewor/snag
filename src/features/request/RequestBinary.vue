@@ -14,32 +14,35 @@ const props = defineProps<{
 
 const tabsStore = useTabsStore()
 
-const filePath = computed(() => props.tab.request?.body.binary || '')
-const fileName = computed(() => props.tab.request?.body.binaryFileName || '')
+const filePath = computed(() => props.tab.requestDraft?.body.binaryPath || '')
+const fileName = computed(() => {
+  const path = filePath.value
+  if (!path) return ''
+  return path.split('/').pop() || path
+})
 
 async function pickFile() {
-  let filePath: string | null = null
+  let selectedPath: string | null = null
 
   if (isTauri) {
     const { open } = await import('@tauri-apps/plugin-dialog')
     const result = await open({ multiple: false, title: 'Select File' })
-    filePath = result as string | null
+    selectedPath = result as string | null
   } else {
-    filePath = prompt('Enter file path (Tauri not available in browser mode):')
+    selectedPath = prompt('Enter file path (Tauri not available in browser mode):')
   }
 
-  if (filePath) {
-    const name = filePath.split('/').pop() || filePath
-    tabsStore.updateTabRequest(props.tab.id, {
-      body: { ...props.tab.request!.body, binary: filePath, binaryFileName: name },
-    })
+  if (selectedPath && props.tab.requestDraft) {
+    props.tab.requestDraft.body.binaryPath = selectedPath
+    tabsStore.recomputeDirty(props.tab.id)
   }
 }
 
 function clearFile() {
-  tabsStore.updateTabRequest(props.tab.id, {
-    body: { ...props.tab.request!.body, binary: undefined, binaryFileName: undefined },
-  })
+  if (props.tab.requestDraft) {
+    props.tab.requestDraft.body.binaryPath = undefined
+    tabsStore.recomputeDirty(props.tab.id)
+  }
 }
 </script>
 

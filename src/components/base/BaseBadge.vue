@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { HttpMethod } from '@/types/common'
+import type { HttpMethod } from '@/domain'
 
 defineProps<{
   method?: HttpMethod | string
@@ -7,13 +7,13 @@ defineProps<{
 }>()
 
 const METHOD_CLASSES: Record<string, string> = {
-  [HttpMethod.GET]: 'text-method-get bg-method-get/10',
-  [HttpMethod.POST]: 'text-method-post bg-method-post/10',
-  [HttpMethod.PUT]: 'text-method-put bg-method-put/10',
-  [HttpMethod.PATCH]: 'text-method-patch bg-method-patch/10',
-  [HttpMethod.DELETE]: 'text-method-delete bg-method-delete/10',
-  [HttpMethod.HEAD]: 'text-method-head bg-method-head/10',
-  [HttpMethod.OPTIONS]: 'text-method-options bg-method-options/10',
+  GET: 'text-method-get bg-method-get/10',
+  POST: 'text-method-post bg-method-post/10',
+  PUT: 'text-method-put bg-method-put/10',
+  PATCH: 'text-method-patch bg-method-patch/10',
+  DELETE: 'text-method-delete bg-method-delete/10',
+  HEAD: 'text-method-head bg-method-head/10',
+  OPTIONS: 'text-method-options bg-method-options/10',
 }
 
 const VARIANT_CLASSES: Record<string, string> = {

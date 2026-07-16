@@ -1,4 +1,5 @@
-import type { Environment, EnvironmentVariable } from '@/types/environment'
+import type { Environment, EnvironmentVariable, EnvironmentId } from '@/domain'
+import { ulid } from '@/domain'
 
 /**
  * Import a Postman Environment JSON export into Snag Environment format.
@@ -14,11 +15,9 @@ export function importPostmanEnvironment(json: unknown): Environment {
   }))
 
   return {
-    id: crypto.randomUUID(),
+    id: ulid() as EnvironmentId,
     name: data.name || 'Imported Environment',
     variables,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
   }
 }
 

@@ -5,10 +5,8 @@ import { Settings, Check, Save, Plus, Folder, FlaskConical, PanelLeft } from 'lu
 
 import { useTabsStore } from '@/stores/tabs'
 import { useWorkspaceStore } from '@/stores/workspace'
-import { ProtocolType } from '@/types/common'
-import type { UUID } from '@/types/common'
 import type { Tab } from '@/stores/tabs'
-import type { CollectionId, FolderId, RequestId } from '@/domain'
+import type { CollectionId, FolderId } from '@/domain'
 import BaseTab from '@/components/base/BaseTab.vue'
 import BaseBadge from '@/components/base/BaseBadge.vue'
 import BaseModal from '@/components/base/BaseModal.vue'
@@ -22,7 +20,7 @@ const emit = defineEmits<{
 }>()
 
 // Rename state
-const renamingTabId = ref<UUID | null>(null)
+const renamingTabId = ref<string | null>(null)
 const renameValue = ref('')
 const renameInputRef = ref<HTMLInputElement | null>(null)
 
@@ -31,7 +29,7 @@ const showSaveModal = ref(false)
 const saveTargetCollectionId = ref<string | null>(null)
 const saveTargetFolderId = ref<string | null>(null)
 
-function startRename(tabId: UUID, currentTitle: string) {
+function startRename(tabId: string, currentTitle: string) {
   renamingTabId.value = tabId
   renameValue.value = currentTitle
   nextTick(() => renameInputRef.value?.focus())
@@ -49,91 +47,14 @@ function cancelRename() {
 }
 
 /**
- * Save tab: if it has a sourceId, save back to workspace request file.
+ * Save tab: if it has a sourceId, save via store.
  * Otherwise, open the "Save to Collection" modal.
  */
 async function handleSave(tab: Tab) {
   if (tab.sourceId) {
-    await saveTabToWorkspace(tab)
+    await tabsStore.saveTab(tab.id)
   } else {
     openSaveModal()
-  }
-}
-
-async function saveTabToWorkspace(tab: Tab) {
-  if (!tab.request || !tab.sourceId) return
-
-  const [_collectionId, requestId] = tab.sourceId.split(':')
-  if (!requestId) return
-
-  try {
-    const existing = await workspaceStore.getRequest(requestId as RequestId)
-    const updated = {
-      ...existing,
-      name: tab.title,
-      method: tab.request.method as any,
-      url: tab.request.url,
-      headers: tab.request.headers.map(h => ({
-        key: h.key,
-        value: h.value,
-        enabled: h.enabled,
-        description: undefined,
-      })),
-      params: tab.request.params.map(p => ({
-        key: p.key,
-        value: p.value,
-        enabled: p.enabled,
-        description: undefined,
-      })),
-      body: mapTabBodyToDomain(tab.request.body),
-      auth: mapTabAuthToDomain(tab.request.auth),
-      preRequest: tab.request.preRequestScript ?? '',
-      tests: tab.request.testScript ?? '',
-    }
-    await workspaceStore.saveRequest(updated)
-    tabsStore.markTabClean(tab.id)
-  } catch (err) {
-    console.error('[TabBar] Failed to save request:', err)
-  }
-}
-
-function mapTabBodyToDomain(body: any): any {
-  const typeMap: Record<string, string> = {
-    none: 'none',
-    json: 'json',
-    raw: 'text',
-    'form-data': 'formdata',
-    'x-www-form-urlencoded': 'urlencoded',
-    binary: 'binary',
-  }
-  return {
-    type: typeMap[body?.type] ?? 'none',
-    content: body?.raw ?? '',
-    formData: body?.formData?.map((f: any) => ({
-      key: f.key,
-      value: f.value,
-      enabled: f.enabled,
-    })),
-    binaryPath: body?.binary,
-  }
-}
-
-function mapTabAuthToDomain(auth: any): any {
-  const typeMap: Record<string, string> = {
-    none: 'none',
-    basic: 'basic',
-    bearer: 'bearer',
-    'api-key': 'apikey',
-  }
-  return {
-    type: typeMap[auth?.type] ?? 'none',
-    basic: auth?.basic,
-    bearer: auth?.bearer,
-    apiKey: auth?.apiKey ? {
-      key: auth.apiKey.key,
-      value: auth.apiKey.value,
-      in: auth.apiKey.addTo === 'query' ? 'query' : 'header',
-    } : undefined,
   }
 }
 
@@ -145,39 +66,25 @@ function openSaveModal() {
 
 async function saveToCollection() {
   const tab = tabsStore.activeTab
-  if (!tab || tab.type !== 'request' || !tab.request || !saveTargetCollectionId.value) return
+  if (!tab || tab.type !== 'request' || !tab.requestDraft || !saveTargetCollectionId.value) return
 
   const request = await workspaceStore.createRequest(
     saveTargetCollectionId.value as CollectionId,
     saveTargetFolderId.value as FolderId | null,
-    { name: tab.title, method: tab.request.method as any },
+    { name: tab.title, method: tab.requestDraft.method as any },
   )
 
-  // Now save the full request data
-  const updated = {
-    ...request,
-    url: tab.request.url,
-    headers: tab.request.headers.map(h => ({
-      key: h.key,
-      value: h.value,
-      enabled: h.enabled,
-      description: undefined,
-    })),
-    params: tab.request.params.map(p => ({
-      key: p.key,
-      value: p.value,
-      enabled: p.enabled,
-      description: undefined,
-    })),
-    body: mapTabBodyToDomain(tab.request.body),
-    auth: mapTabAuthToDomain(tab.request.auth),
-    preRequest: tab.request.preRequestScript ?? '',
-    tests: tab.request.testScript ?? '',
-  }
-  await workspaceStore.saveRequest(updated)
+  // Link tab to the new request so subsequent saves go through saveTab
+  const sourceId = `${saveTargetCollectionId.value}:${request.id}`
+  tabsStore.linkTabToSource(tab.id, sourceId)
 
-  // Link tab to the new request
-  tabsStore.linkTabToSource(tab.id, `${saveTargetCollectionId.value}:${request.id}`)
+  // Now assign requestId and save the full draft
+  const tabRef = tabsStore.tabs.find(t => t.id === tab.id)
+  if (tabRef) {
+    tabRef.requestId = request.id
+    await tabsStore.saveTab(tab.id)
+  }
+
   showSaveModal.value = false
 }
 
@@ -186,7 +93,7 @@ async function handleSaveAndClose() {
   if (!tabId) return
   const tab = tabsStore.tabs.find((t) => t.id === tabId)
   if (tab && tab.type === 'request' && tab.isDirty) {
-    await saveTabToWorkspace(tab)
+    await tabsStore.saveTab(tab.id)
   }
   tabsStore.forceCloseTab(tabId)
 }
@@ -215,19 +122,23 @@ async function handleSaveAndClose() {
         @close="tabsStore.closeTab(tab.id)"
       >
         <!-- Request tab -->
-        <template v-if="tab.type === 'request' && tab.request">
+        <template v-if="tab.type === 'request' && tab.requestDraft">
           <span
-            v-if="tab.protocol && tab.protocol !== ProtocolType.REST"
+            v-if="tab.protocol && tab.protocol !== 'rest'"
             class="text-[9px] font-bold uppercase px-1 py-0.5 rounded mr-0.5"
             :class="{
-              'bg-amber-500/10 text-amber-500': tab.protocol === ProtocolType.WEBSOCKET,
-              'bg-pink-500/10 text-pink-500': tab.protocol === ProtocolType.GRAPHQL,
-              'bg-blue-500/10 text-blue-500': tab.protocol === ProtocolType.GRPC,
+              'bg-amber-500/10 text-amber-500': tab.protocol === 'websocket',
+              'bg-pink-500/10 text-pink-500': tab.protocol === 'graphql',
+              'bg-blue-500/10 text-blue-500': tab.protocol === 'grpc',
             }"
           >
-            {{ tab.protocol === ProtocolType.WEBSOCKET ? 'WS' : tab.protocol === ProtocolType.GRAPHQL ? 'GQL' : 'gRPC' }}
+            {{ tab.protocol === 'websocket' ? 'WS' : tab.protocol === 'graphql' ? 'GQL' : 'gRPC' }}
           </span>
-          <BaseBadge v-else :method="tab.request.method" />
+          <BaseBadge v-else :method="tab.requestDraft.method" />
+        </template>
+        <!-- Request tab without loaded draft (show default badge) -->
+        <template v-else-if="tab.type === 'request'">
+          <BaseBadge method="GET" />
         </template>
         <!-- Settings icon -->
         <template v-else-if="tab.type === 'settings'">

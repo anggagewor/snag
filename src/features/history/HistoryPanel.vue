@@ -1,16 +1,48 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 
-import { X, Clock } from 'lucide-vue-next'
+import { X, Clock, Search } from 'lucide-vue-next'
 
 import { useHistoryStore } from '@/stores/history'
 import { useTabsStore } from '@/stores/tabs'
-import type { HistoryEntry } from '@/stores/history'
+import type { HistoryEntry, HttpMethod } from '@/domain'
 import BaseBadge from '@/components/base/BaseBadge.vue'
 import BaseButton from '@/components/base/BaseButton.vue'
+import BaseSelect from '@/components/base/BaseSelect.vue'
+import type { SelectOption } from '@/components/base/BaseSelect.vue'
 
 const historyStore = useHistoryStore()
 const tabsStore = useTabsStore()
+
+// ─── Filter State ────────────────────────────────────────────────
+
+const filterMethod = ref<string>('')
+const filterUrl = ref<string>('')
+
+const methodOptions: SelectOption[] = [
+  { label: 'All', value: '' },
+  { label: 'GET', value: 'GET' },
+  { label: 'POST', value: 'POST' },
+  { label: 'PUT', value: 'PUT' },
+  { label: 'PATCH', value: 'PATCH' },
+  { label: 'DELETE', value: 'DELETE' },
+  { label: 'HEAD', value: 'HEAD' },
+  { label: 'OPTIONS', value: 'OPTIONS' },
+]
+
+let debounceTimer: ReturnType<typeof setTimeout> | null = null
+
+watch([filterMethod, filterUrl], () => {
+  if (debounceTimer) clearTimeout(debounceTimer)
+  debounceTimer = setTimeout(() => {
+    historyStore.query({
+      method: (filterMethod.value || undefined) as HttpMethod | undefined,
+      urlContains: filterUrl.value || undefined,
+    })
+  }, 300)
+})
+
+// ─── Grouped Entries ─────────────────────────────────────────────
 
 const groupedEntries = computed(() => {
   const groups: { label: string; entries: HistoryEntry[] }[] = []
@@ -40,22 +72,29 @@ const groupedEntries = computed(() => {
   return groups
 })
 
+// ─── Actions ─────────────────────────────────────────────────────
+
 function openEntry(entry: HistoryEntry) {
   const sourceId = `history:${entry.id}`
-  const requestCopy = JSON.parse(JSON.stringify(entry.request))
-  const tab = tabsStore.openRequestTab(requestCopy, getEntryTitle(entry), sourceId)
-  if (entry.response) {
-    tabsStore.updateTabResponse(tab.id, JSON.parse(JSON.stringify(entry.response)))
+  const title = getEntryTitle(entry)
+
+  if (entry.requestId) {
+    tabsStore.openRequestTab(entry.requestId, sourceId, title)
+  } else {
+    const tab = tabsStore.openRequestTab(undefined, sourceId, title)
+    if (tab.requestDraft) {
+      tab.requestDraft.method = entry.method
+      tab.requestDraft.url = entry.url
+    }
   }
 }
 
 function getEntryTitle(entry: HistoryEntry): string {
-  const url = entry.request.url
   try {
-    const parsed = new URL(url)
-    return `${entry.request.method} ${parsed.pathname}`
+    const parsed = new URL(entry.url)
+    return `${entry.method} ${parsed.pathname}`
   } catch {
-    return `${entry.request.method} ${url.slice(0, 40)}`
+    return `${entry.method} ${entry.url.slice(0, 40)}`
   }
 }
 
@@ -64,8 +103,20 @@ function formatTime(iso: string): string {
   return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
 }
 
-function getStatusVariant(status: number | undefined): 'success' | 'warning' | 'error' | 'neutral' {
-  if (!status) return 'neutral'
+function formatDuration(ms: number): string {
+  if (ms < 1000) return `${ms}ms`
+  return `${(ms / 1000).toFixed(1)}s`
+}
+
+function formatSize(bytes: number): string {
+  if (bytes === 0) return ''
+  if (bytes < 1024) return `${bytes}B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)}KB`
+  return `${(bytes / (1024 * 1024)).toFixed(1)}MB`
+}
+
+function getStatusVariant(status: number): 'success' | 'warning' | 'error' | 'neutral' {
+  if (status === 0) return 'neutral'
   if (status >= 200 && status < 300) return 'success'
   if (status >= 300 && status < 500) return 'warning'
   return 'error'
@@ -85,6 +136,28 @@ function getStatusVariant(status: number | undefined): 'success' | 'warning' | '
       >
         Clear
       </BaseButton>
+    </div>
+
+    <!-- Filter Bar -->
+    <div class="px-3 py-2 border-b border-border flex-shrink-0 space-y-1.5">
+      <div class="flex gap-1.5">
+        <BaseSelect
+          v-model="filterMethod"
+          :options="methodOptions"
+          size="sm"
+          placeholder="All"
+          class="w-24 flex-shrink-0"
+        />
+        <div class="relative flex-1">
+          <Search class="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-muted" />
+          <input
+            v-model="filterUrl"
+            type="text"
+            placeholder="Filter URL..."
+            class="w-full rounded-md border border-border bg-surface text-primary placeholder:text-muted text-xs pl-6 pr-2 py-1 focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent/50"
+          />
+        </div>
+      </div>
     </div>
 
     <!-- Empty state -->
@@ -109,15 +182,21 @@ function getStatusVariant(status: number | undefined): 'success' | 'warning' | '
             class="flex items-center gap-2 px-2 py-1.5 rounded text-xs hover:bg-surface-hover cursor-pointer group"
             @click="openEntry(entry)"
           >
-            <BaseBadge :method="entry.request.method" />
+            <BaseBadge :method="entry.method" />
             <span class="flex-1 truncate text-primary font-mono text-[11px]">
-              {{ entry.request.url || 'No URL' }}
+              {{ entry.url || 'No URL' }}
+            </span>
+            <span v-if="entry.duration > 0" class="text-[10px] text-muted flex-shrink-0">
+              {{ formatDuration(entry.duration) }}
+            </span>
+            <span v-if="entry.responseSize > 0" class="text-[10px] text-muted flex-shrink-0">
+              {{ formatSize(entry.responseSize) }}
             </span>
             <BaseBadge
-              v-if="entry.response"
-              :variant="getStatusVariant(entry.response.status)"
+              v-if="entry.status > 0"
+              :variant="getStatusVariant(entry.status)"
             >
-              {{ entry.response.status }}
+              {{ entry.status }}
             </BaseBadge>
             <span class="text-[10px] text-muted flex-shrink-0">{{ formatTime(entry.timestamp) }}</span>
             <!-- Delete button -->

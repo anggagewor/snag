@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 
 import { Folder, Clock, FlaskConical, Plus, Zap, FolderPlus, Upload } from 'lucide-vue-next'
 
@@ -10,12 +10,36 @@ import BaseDropdown from '@/components/base/BaseDropdown.vue'
 import CollectionTree from './CollectionTree.vue'
 import ImportModal from './ImportModal.vue'
 import HistoryPanel from '@/features/history/HistoryPanel.vue'
+import WorkspaceSwitcher from './WorkspaceSwitcher.vue'
 
 const workspaceStore = useWorkspaceStore()
 const tabsStore = useTabsStore()
 
 const activeSection = ref<'collections' | 'history' | 'envs'>('collections')
 const showImportModal = ref(false)
+
+onMounted(async () => {
+  await workspaceStore.loadRecentWorkspaces()
+})
+
+async function handleWorkspaceSwitch(path: string) {
+  try {
+    await workspaceStore.switchWorkspace(path)
+  } catch (err) {
+    console.error('[Sidebar] Workspace switch failed:', err)
+  }
+}
+
+async function handleWorkspaceCreate(name: string, path: string) {
+  try {
+    await workspaceStore.createWorkspace(name, path)
+    const { useSettingsStore } = await import('@/stores/settings')
+    const settingsStore = useSettingsStore()
+    await settingsStore.reloadWorkspaceSettings()
+  } catch (err) {
+    console.error('[Sidebar] Workspace creation failed:', err)
+  }
+}
 
 function handleNewRequest() {
   tabsStore.openRequestTab()
@@ -44,6 +68,14 @@ async function handleNewFolderInCollection() {
 
 <template>
   <div class="flex flex-col h-full">
+    <!-- Workspace switcher row -->
+    <div class="flex items-center px-3 h-[33px] border-b border-border">
+      <WorkspaceSwitcher
+        @switch="handleWorkspaceSwitch"
+        @create="handleWorkspaceCreate"
+      />
+    </div>
+
     <!-- Sidebar header -->
     <div class="flex items-center justify-between px-3 h-[41px] border-b border-border">
       <!-- Section tabs -->

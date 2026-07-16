@@ -12,8 +12,9 @@
  */
 
 import type { WorkspaceEntry } from '../domain'
-import { initServices, useRegistryService, useStorageAdapter } from './provider'
+import { initServices, useRegistryService, useHistoryService, useStorageAdapter } from './provider'
 import { detectV0Data, migrateV0ToV1, type MigrationResult } from './migration'
+import { migrateLegacyHistory } from './historyMigration'
 import { ensureScratchPad } from './scratch'
 
 export interface StartupResult {
@@ -45,6 +46,10 @@ export async function startApp(): Promise<StartupResult> {
     migration = await migrateV0ToV1(storage, registry)
     console.info('[startup] Migration complete:', migration)
   }
+
+  // 2b. Migrate legacy history (if history.json exists)
+  const historyService = useHistoryService()
+  await migrateLegacyHistory(storage, historyService)
 
   // 3. Ensure scratch pad
   const scratchPadPath = await ensureScratchPad(storage)

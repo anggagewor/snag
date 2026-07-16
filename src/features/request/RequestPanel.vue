@@ -6,8 +6,8 @@ import { useHistoryStore } from '@/stores/history'
 import { useWorkspaceStore } from '@/stores/workspace'
 import { useHttp } from '@/composables/useHttp'
 import { useScriptRunner } from '@/composables/useScriptRunner'
-import { HttpMethod, ProtocolType } from '@/types/common'
 import type { Tab } from '@/stores/tabs'
+import type { HttpMethod, ProtocolType } from '@/domain'
 import type { TestResult } from '@/composables/useScriptRunner'
 import BaseSplitPane from '@/components/base/BaseSplitPane.vue'
 import RequestUrlBar from './RequestUrlBar.vue'
@@ -32,21 +32,30 @@ const activeSection = ref<'params' | 'headers' | 'body' | 'auth' | 'scripts'>('p
 const scriptLogs = ref<string[]>([])
 const testResults = ref<TestResult[]>([])
 
-const request = computed(() => props.tab.request!)
+const request = computed(() => props.tab.requestDraft!)
 
 function updateMethod(method: HttpMethod) {
-  tabsStore.updateTabRequest(props.tab.id, { method })
+  if (props.tab.requestDraft) {
+    props.tab.requestDraft.method = method
+    tabsStore.recomputeDirty(props.tab.id)
+  }
 }
 
 function updateUrl(url: string) {
-  tabsStore.updateTabRequest(props.tab.id, { url })
+  if (props.tab.requestDraft) {
+    props.tab.requestDraft.url = url
+    tabsStore.recomputeDirty(props.tab.id)
+  }
 }
 
 function updateProtocol(protocol: ProtocolType) {
   const tab = tabsStore.tabs.find((t) => t.id === props.tab.id)
   if (tab) {
     tab.protocol = protocol
-    tab.isDirty = true
+    if (tab.requestDraft) {
+      tab.requestDraft.protocol = protocol
+      tabsStore.recomputeDirty(tab.id)
+    }
   }
 }
 
@@ -60,8 +69,8 @@ async function handleSend() {
   const envVars = { ...workspaceStore.resolvedVariables }
 
   // Run pre-request script
-  if (request.value.preRequestScript) {
-    const preResult = runPreRequestScript(request.value.preRequestScript, {
+  if (request.value.preRequest) {
+    const preResult = runPreRequestScript(request.value.preRequest, {
       variables: envVars,
       request: {
         url: request.value.url,
@@ -78,7 +87,6 @@ async function handleSend() {
       scriptLogs.value.push(`[pre-request error] ${preResult.error}`)
     }
 
-    // Apply variable changes back to environment (runtime only)
     for (const [key, value] of Object.entries(preResult.variables)) {
       if (envVars[key] !== value) {
         envVars[key] = value
@@ -91,8 +99,8 @@ async function handleSend() {
   historyStore.addEntry(request.value, response)
 
   // Run test script
-  if (request.value.testScript && response) {
-    const testResult = runTestScript(request.value.testScript, {
+  if (request.value.tests && response) {
+    const testResult = runTestScript(request.value.tests, {
       variables: envVars,
       request: {
         url: request.value.url,
@@ -134,8 +142,6 @@ async function handleSend() {
       @send="handleSend"
     />
 
-    <!-- Error display (inline, no longer separate) -->
-
     <!-- Request/Response split -->
     <BaseSplitPane :initial-split="50" class="flex-1">
       <template #top>
@@ -172,7 +178,7 @@ async function handleSend() {
       </template>
 
       <template #bottom>
-        <ResponsePanel :response="tab.response" :request="tab.request" :is-loading="isLoading" :error="error" @cancel="cancelRequest" />
+        <ResponsePanel :response="tab.response" :is-loading="isLoading" :error="error" @cancel="cancelRequest" />
       </template>
     </BaseSplitPane>
   </div>

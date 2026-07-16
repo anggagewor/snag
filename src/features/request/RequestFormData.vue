@@ -5,7 +5,7 @@ import { X } from 'lucide-vue-next'
 
 import { useTabsStore } from '@/stores/tabs'
 import type { Tab } from '@/stores/tabs'
-import type { FormDataField } from '@/types/request'
+import type { KeyValuePairEditable } from '@/domain'
 import BaseEnvInput from '@/components/base/BaseEnvInput.vue'
 
 const isTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window
@@ -16,15 +16,20 @@ const props = defineProps<{
 
 const tabsStore = useTabsStore()
 
-const fields = computed(() => {
-  const items = props.tab.request?.body.formData || []
+interface FormDataFieldEditable extends KeyValuePairEditable {
+  fieldType?: 'text' | 'file'
+  fileName?: string
+}
+
+const fields = computed((): FormDataFieldEditable[] => {
+  const items = props.tab.requestDraft?.body.formData || []
   if (items.length === 0) {
     return [createEmptyField()]
   }
-  return items
+  return items as FormDataFieldEditable[]
 })
 
-function createEmptyField(): FormDataField {
+function createEmptyField(): FormDataFieldEditable {
   return {
     id: crypto.randomUUID(),
     key: '',
@@ -34,14 +39,15 @@ function createEmptyField(): FormDataField {
   }
 }
 
-function sync(updated: FormDataField[]) {
+function sync(updated: FormDataFieldEditable[]) {
   const cleaned = updated.filter((item, i) => {
     if (i === updated.length - 1) return true
     return item.key !== '' || item.value !== ''
   })
-  tabsStore.updateTabRequest(props.tab.id, {
-    body: { ...props.tab.request!.body, formData: cleaned },
-  })
+  if (props.tab.requestDraft) {
+    props.tab.requestDraft.body.formData = cleaned
+    tabsStore.recomputeDirty(props.tab.id)
+  }
 }
 
 function updateKey(index: number, value: string) {
@@ -93,7 +99,6 @@ async function pickFile(index: number) {
     const result = await open({ multiple: false, title: 'Select File' })
     filePath = result as string | null
   } else {
-    // Browser fallback: prompt for path
     filePath = prompt('Enter file path (Tauri not available in browser mode):')
   }
 

@@ -5,7 +5,7 @@ import { Ban } from 'lucide-vue-next'
 
 import { useTabsStore } from '@/stores/tabs'
 import type { Tab } from '@/stores/tabs'
-import type { AuthType, AuthConfig } from '@/types/request'
+import type { AuthType, RequestAuthDraft } from '@/domain'
 import BaseEnvInput from '@/components/base/BaseEnvInput.vue'
 
 const props = defineProps<{
@@ -14,27 +14,29 @@ const props = defineProps<{
 
 const tabsStore = useTabsStore()
 
-const auth = computed(() => props.tab.request?.auth || { type: 'none' as AuthType })
+const auth = computed(() => props.tab.requestDraft?.auth || { type: 'none' as AuthType })
 
 const authTypes: { label: string; value: AuthType; icon: string }[] = [
   { label: 'No Auth', value: 'none', icon: 'M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636' },
   { label: 'Bearer Token', value: 'bearer', icon: 'M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z' },
   { label: 'Basic Auth', value: 'basic', icon: 'M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z' },
-  { label: 'API Key', value: 'api-key', icon: 'M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z' },
+  { label: 'API Key', value: 'apikey', icon: 'M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z' },
 ]
 
 function setAuthType(type: AuthType) {
-  const newAuth: AuthConfig = { type }
+  if (!props.tab.requestDraft) return
+  const newAuth: RequestAuthDraft = { type }
   if (type === 'bearer') newAuth.bearer = { token: '' }
   if (type === 'basic') newAuth.basic = { username: '', password: '' }
-  if (type === 'api-key') newAuth.apiKey = { key: '', value: '', addTo: 'header' }
-  tabsStore.updateTabRequest(props.tab.id, { auth: newAuth })
+  if (type === 'apikey') newAuth.apiKey = { key: '', value: '', in: 'header' }
+  props.tab.requestDraft.auth = newAuth
+  tabsStore.recomputeDirty(props.tab.id)
 }
 
-function updateAuth(updates: Partial<AuthConfig>) {
-  tabsStore.updateTabRequest(props.tab.id, {
-    auth: { ...auth.value, ...updates },
-  })
+function updateAuth(updates: Partial<RequestAuthDraft>) {
+  if (!props.tab.requestDraft) return
+  props.tab.requestDraft.auth = { ...props.tab.requestDraft.auth, ...updates }
+  tabsStore.recomputeDirty(props.tab.id)
 }
 </script>
 
@@ -112,7 +114,7 @@ function updateAuth(updates: Partial<AuthConfig>) {
       </div>
 
       <!-- API Key -->
-      <div v-else-if="auth.type === 'api-key'" class="space-y-3">
+      <div v-else-if="auth.type === 'apikey'" class="space-y-3">
         <div class="text-xs text-muted uppercase font-medium tracking-wide">API Key</div>
         <div class="space-y-3">
           <div class="space-y-1.5">
@@ -140,9 +142,9 @@ function updateAuth(updates: Partial<AuthConfig>) {
                 <input
                   type="radio"
                   name="apikey-addto"
-                  :checked="auth.apiKey?.addTo === 'header'"
+                  :checked="auth.apiKey?.in === 'header'"
                   class="accent-accent"
-                  @change="updateAuth({ apiKey: { ...auth.apiKey!, addTo: 'header' } })"
+                  @change="updateAuth({ apiKey: { ...auth.apiKey!, in: 'header' } })"
                 />
                 Header
               </label>
@@ -150,9 +152,9 @@ function updateAuth(updates: Partial<AuthConfig>) {
                 <input
                   type="radio"
                   name="apikey-addto"
-                  :checked="auth.apiKey?.addTo === 'query'"
+                  :checked="auth.apiKey?.in === 'query'"
                   class="accent-accent"
-                  @change="updateAuth({ apiKey: { ...auth.apiKey!, addTo: 'query' } })"
+                  @change="updateAuth({ apiKey: { ...auth.apiKey!, in: 'query' } })"
                 />
                 Query Params
               </label>

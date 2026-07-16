@@ -3,7 +3,6 @@ import { X, Plus } from 'lucide-vue-next'
 
 import { useSettingsStore } from '@/stores/settings'
 import { useTheme } from '@/composables/useTheme'
-import type { ThemeMode } from '@/types/common'
 import BaseSelect from '@/components/base/BaseSelect.vue'
 import type { SelectOption } from '@/components/base/BaseSelect.vue'
 
@@ -16,54 +15,49 @@ const themeOptions: SelectOption[] = [
   { label: 'Dark', value: 'dark' },
 ]
 
-const methodOptions: SelectOption[] = [
-  { label: 'GET', value: 'GET', color: '#10b981' },
-  { label: 'POST', value: 'POST', color: '#f59e0b' },
-  { label: 'PUT', value: 'PUT', color: '#3b82f6' },
-  { label: 'PATCH', value: 'PATCH', color: '#8b5cf6' },
-  { label: 'DELETE', value: 'DELETE', color: '#ef4444' },
-]
-
 function updateTheme(value: string) {
-  const mode = value as ThemeMode
+  const mode = value as 'light' | 'dark' | 'system'
   setTheme(mode)
-  settingsStore.updateSettings({ theme: mode })
+  settingsStore.updateGlobal({ theme: mode })
+}
+
+function updateFontSize(value: string) {
+  const num = parseInt(value)
+  if (!isNaN(num) && num >= 8 && num <= 32) {
+    settingsStore.updateGlobal({ fontSize: num })
+  }
+}
+
+function updateFontFamily(value: string) {
+  if (value.trim()) {
+    settingsStore.updateGlobal({ fontFamily: value.trim() })
+  }
 }
 
 function updateTimeout(value: string) {
   const num = parseInt(value)
   if (!isNaN(num) && num > 0) {
-    settingsStore.updateSettings({ timeout: num })
+    settingsStore.updateWorkspace({ timeout: num })
   }
-}
-
-function updateMaxHistory(value: string) {
-  const num = parseInt(value)
-  if (!isNaN(num) && num > 0) {
-    settingsStore.updateSettings({ maxHistoryItems: num })
-  }
-}
-
-function toggleDefaultHeader(index: number) {
-  const headers = [...settingsStore.settings.defaultHeaders]
-  headers[index] = { ...headers[index], enabled: !headers[index].enabled }
-  settingsStore.updateSettings({ defaultHeaders: headers })
 }
 
 function updateDefaultHeader(index: number, field: 'key' | 'value', value: string) {
-  const headers = [...settingsStore.settings.defaultHeaders]
+  const current = settingsStore.resolved.defaultHeaders ?? []
+  const headers = [...current]
   headers[index] = { ...headers[index], [field]: value }
-  settingsStore.updateSettings({ defaultHeaders: headers })
+  settingsStore.updateWorkspace({ defaultHeaders: headers })
 }
 
 function removeDefaultHeader(index: number) {
-  const headers = settingsStore.settings.defaultHeaders.filter((_, i) => i !== index)
-  settingsStore.updateSettings({ defaultHeaders: headers })
+  const current = settingsStore.resolved.defaultHeaders ?? []
+  const headers = current.filter((_, i) => i !== index)
+  settingsStore.updateWorkspace({ defaultHeaders: headers })
 }
 
 function addDefaultHeader() {
-  const headers = [...settingsStore.settings.defaultHeaders, { key: '', value: '', enabled: true }]
-  settingsStore.updateSettings({ defaultHeaders: headers })
+  const current = settingsStore.resolved.defaultHeaders ?? []
+  const headers = [...current, { key: '', value: '' }]
+  settingsStore.updateWorkspace({ defaultHeaders: headers })
 }
 </script>
 
@@ -75,9 +69,13 @@ function addDefaultHeader() {
       <p class="text-sm text-secondary mt-0.5">Configure Snag to your liking</p>
     </div>
 
-    <!-- Appearance -->
+    <!-- Appearance (Global) -->
     <section class="space-y-4">
-      <h3 class="text-sm font-medium text-primary border-b border-border pb-2">Appearance</h3>
+      <h3 class="text-sm font-medium text-primary border-b border-border pb-2">
+        Appearance
+        <span class="ml-2 text-xs text-muted font-normal">(global)</span>
+      </h3>
+
       <div class="flex items-center justify-between">
         <div>
           <p class="text-sm text-primary">Theme</p>
@@ -92,26 +90,46 @@ function addDefaultHeader() {
           />
         </div>
       </div>
-    </section>
-
-    <!-- Request Defaults -->
-    <section class="space-y-4">
-      <h3 class="text-sm font-medium text-primary border-b border-border pb-2">Request Defaults</h3>
 
       <div class="flex items-center justify-between">
         <div>
-          <p class="text-sm text-primary">Default Method</p>
-          <p class="text-xs text-muted">Method used when creating new requests</p>
+          <p class="text-sm text-primary">Font Size</p>
+          <p class="text-xs text-muted">Editor font size in pixels</p>
         </div>
         <div class="w-[160px]">
-          <BaseSelect
-            :model-value="settingsStore.settings.defaultMethod"
-            :options="methodOptions"
-            size="sm"
-            @update:model-value="(v) => settingsStore.updateSettings({ defaultMethod: v })"
+          <input
+            :value="settingsStore.resolved.fontSize"
+            type="number"
+            min="8"
+            max="32"
+            class="w-full rounded-md border border-border bg-surface text-primary text-sm px-3 py-1 focus:outline-none focus:border-accent"
+            @input="updateFontSize(($event.target as HTMLInputElement).value)"
           />
         </div>
       </div>
+
+      <div class="flex items-center justify-between">
+        <div>
+          <p class="text-sm text-primary">Font Family</p>
+          <p class="text-xs text-muted">Monospace font for editor and code</p>
+        </div>
+        <div class="w-[240px]">
+          <input
+            :value="settingsStore.resolved.fontFamily"
+            type="text"
+            class="w-full rounded-md border border-border bg-surface text-primary text-sm px-3 py-1 focus:outline-none focus:border-accent"
+            @change="updateFontFamily(($event.target as HTMLInputElement).value)"
+          />
+        </div>
+      </div>
+    </section>
+
+    <!-- Request Defaults (Workspace) -->
+    <section class="space-y-4">
+      <h3 class="text-sm font-medium text-primary border-b border-border pb-2">
+        Request Defaults
+        <span class="ml-2 text-xs text-muted font-normal">(workspace)</span>
+      </h3>
 
       <div class="flex items-center justify-between">
         <div>
@@ -120,7 +138,7 @@ function addDefaultHeader() {
         </div>
         <div class="w-[160px]">
           <input
-            :value="settingsStore.settings.timeout"
+            :value="settingsStore.resolved.timeout"
             type="number"
             min="1"
             max="300"
@@ -138,9 +156,9 @@ function addDefaultHeader() {
         <label class="relative inline-flex items-center cursor-pointer">
           <input
             type="checkbox"
-            :checked="settingsStore.settings.followRedirects"
+            :checked="settingsStore.resolved.followRedirects"
             class="sr-only peer"
-            @change="settingsStore.updateSettings({ followRedirects: !settingsStore.settings.followRedirects })"
+            @change="settingsStore.updateWorkspace({ followRedirects: !settingsStore.resolved.followRedirects })"
           />
           <div class="w-9 h-5 bg-border rounded-full peer peer-checked:bg-accent transition-colors after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-full" />
         </label>
@@ -148,47 +166,46 @@ function addDefaultHeader() {
 
       <div class="flex items-center justify-between">
         <div>
-          <p class="text-sm text-primary">Verify SSL Certificates</p>
+          <p class="text-sm text-primary">Validate SSL Certificates</p>
           <p class="text-xs text-muted">Disable for self-signed certs in local dev</p>
         </div>
         <label class="relative inline-flex items-center cursor-pointer">
           <input
             type="checkbox"
-            :checked="settingsStore.settings.verifySSL"
+            :checked="settingsStore.resolved.validateSsl"
             class="sr-only peer"
-            @change="settingsStore.updateSettings({ verifySSL: !settingsStore.settings.verifySSL })"
+            @change="settingsStore.updateWorkspace({ validateSsl: !settingsStore.resolved.validateSsl })"
           />
           <div class="w-9 h-5 bg-border rounded-full peer peer-checked:bg-accent transition-colors after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-full" />
         </label>
       </div>
     </section>
 
-    <!-- Default Headers -->
+    <!-- Default Headers (Workspace) -->
     <section class="space-y-4">
-      <h3 class="text-sm font-medium text-primary border-b border-border pb-2">Default Headers</h3>
-      <p class="text-xs text-muted">These headers are automatically included in every request. Uncheck to disable.</p>
+      <h3 class="text-sm font-medium text-primary border-b border-border pb-2">
+        Default Headers
+        <span class="ml-2 text-xs text-muted font-normal">(workspace)</span>
+      </h3>
+      <p class="text-xs text-muted">These headers are automatically included in every request.</p>
 
       <div class="space-y-2">
         <div
-          v-for="(header, index) in settingsStore.settings.defaultHeaders"
+          v-for="(header, index) in settingsStore.resolved.defaultHeaders ?? []"
           :key="index"
           class="flex items-center gap-3 px-3 py-2 border border-border rounded"
         >
-          <input
-            type="checkbox"
-            :checked="header.enabled"
-            class="w-4 h-4 rounded accent-accent cursor-pointer"
-            @change="toggleDefaultHeader(index)"
-          />
           <div class="flex-1 flex items-center gap-2">
             <input
               :value="header.key"
+              placeholder="Header name"
               class="w-[160px] text-sm font-mono text-primary bg-transparent border-b border-transparent focus:border-accent focus:outline-none"
               @input="updateDefaultHeader(index, 'key', ($event.target as HTMLInputElement).value)"
             />
             <span class="text-muted">:</span>
             <input
               :value="header.value"
+              placeholder="Header value"
               class="flex-1 text-sm font-mono text-secondary bg-transparent border-b border-transparent focus:border-accent focus:outline-none"
               @input="updateDefaultHeader(index, 'value', ($event.target as HTMLInputElement).value)"
             />
@@ -208,28 +225,6 @@ function addDefaultHeader() {
           <Plus class="w-3.5 h-3.5" />
           Add Header
         </button>
-      </div>
-    </section>
-
-    <!-- Data -->
-    <section class="space-y-4">
-      <h3 class="text-sm font-medium text-primary border-b border-border pb-2">Data</h3>
-
-      <div class="flex items-center justify-between">
-        <div>
-          <p class="text-sm text-primary">Max History Items</p>
-          <p class="text-xs text-muted">Number of requests to keep in history</p>
-        </div>
-        <div class="w-[160px]">
-          <input
-            :value="settingsStore.settings.maxHistoryItems"
-            type="number"
-            min="10"
-            max="1000"
-            class="w-full rounded-md border border-border bg-surface text-primary text-sm px-3 py-1 focus:outline-none focus:border-accent"
-            @input="updateMaxHistory(($event.target as HTMLInputElement).value)"
-          />
-        </div>
       </div>
     </section>
 

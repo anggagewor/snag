@@ -1,7 +1,6 @@
 import { ref, watch } from 'vue'
 
-import { useStorage } from '@/composables/useStorage'
-import type { ThemeMode } from '@/types/common'
+type ThemeMode = 'light' | 'dark' | 'system'
 
 const themeMode = ref<ThemeMode>('system')
 let initialized = false
@@ -16,8 +15,6 @@ function applyTheme(mode: ThemeMode) {
 }
 
 export function useTheme() {
-  const { read, write } = useStorage()
-
   if (!initialized) {
     initialized = true
 
@@ -29,17 +26,19 @@ export function useTheme() {
     })
 
     watch(themeMode, (mode) => {
-      write('theme.json', { theme: mode })
       applyTheme(mode)
     })
   }
 
   applyTheme(themeMode.value)
 
-  async function loadTheme() {
-    const data = await read<{ theme: ThemeMode }>('theme.json', { theme: 'system' })
-    themeMode.value = data.theme
-    applyTheme(themeMode.value)
+  /**
+   * Load theme from settings store.
+   * Called after settingsStore.load() to sync theme state.
+   */
+  function loadFromSettings(theme: ThemeMode) {
+    themeMode.value = theme
+    applyTheme(theme)
   }
 
   function setTheme(mode: ThemeMode) {
@@ -49,6 +48,6 @@ export function useTheme() {
   return {
     themeMode,
     setTheme,
-    loadTheme,
+    loadFromSettings,
   }
 }

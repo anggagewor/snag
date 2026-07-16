@@ -1,4 +1,4 @@
-import type { Environment } from '@/types/environment'
+import type { Environment } from '@/domain'
 
 /**
  * Export a Snag Environment to Postman Environment JSON format.

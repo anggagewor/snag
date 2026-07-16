@@ -1,79 +1,158 @@
+/**
+ * Settings Store — layered settings management (global + workspace).
+ *
+ * Delegates persistence to SettingsService.
+ * Merges global + workspace settings into a reactive ResolvedSettings.
+ *
+ * Backward compat:
+ * - `settings` computed maps to `resolved` so existing UI keeps working
+ * - `updateSettings` deprecated alias maps to `updateGlobal`
+ */
+
 import { defineStore } from 'pinia'
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 
-import { useStorage } from '@/composables/useStorage'
-import { debounce } from '@/utils/debounce'
-import type { ThemeMode } from '@/types/common'
+import type { GlobalSettings, WorkspaceSettings } from '@/domain'
+import { useSettingsService } from '@/services/provider'
+import type { ResolvedSettings } from '@/services/SettingsService'
 
-const STORAGE_FILE = 'settings.json'
+export type { ResolvedSettings } from '@/services/SettingsService'
 
-export interface DefaultHeader {
-  key: string
-  value: string
-  enabled: boolean
+const DEFAULT_GLOBAL: GlobalSettings = {
+  theme: 'dark',
+  fontSize: 13,
+  fontFamily: 'SF Mono, Menlo, Monaco, monospace',
+  language: 'en',
 }
 
-export interface AppSettings {
-  theme: ThemeMode
-  defaultMethod: string
-  followRedirects: boolean
-  verifySSL: boolean
-  timeout: number // seconds
-  maxHistoryItems: number
-  sidebarWidth: number
-  defaultHeaders: DefaultHeader[]
-}
-
-const DEFAULT_SETTINGS: AppSettings = {
-  theme: 'system',
-  defaultMethod: 'GET',
-  followRedirects: true,
-  verifySSL: true,
-  timeout: 30,
-  maxHistoryItems: 100,
-  sidebarWidth: 280,
-  defaultHeaders: [
-    { key: 'User-Agent', value: 'SnagRuntime/1.0.0', enabled: true },
-    { key: 'Accept', value: '*/*', enabled: true },
-    { key: 'Accept-Encoding', value: 'gzip, deflate, br', enabled: true },
-  ],
+function mergeSettings(
+  global: GlobalSettings,
+  workspace: WorkspaceSettings | null,
+): ResolvedSettings {
+  return {
+    // Global-only fields
+    theme: global.theme,
+    fontSize: global.fontSize,
+    fontFamily: global.fontFamily,
+    language: global.language,
+    // Workspace-overridable fields (with defaults)
+    proxy: workspace?.proxy ?? undefined,
+    defaultHeaders: workspace?.defaultHeaders ?? undefined,
+    timeout: workspace?.timeout ?? 30,
+    followRedirects: workspace?.followRedirects ?? true,
+    validateSsl: workspace?.validateSsl ?? true,
+  }
 }
 
 export const useSettingsStore = defineStore('settings', () => {
-  const settings = ref<AppSettings>({ ...DEFAULT_SETTINGS })
+  const global = ref<GlobalSettings>({ ...DEFAULT_GLOBAL })
+  const workspace = ref<WorkspaceSettings | null>(null)
+  const resolved = ref<ResolvedSettings>(mergeSettings(DEFAULT_GLOBAL, null))
   const isLoading = ref(false)
 
-  const { read, write } = useStorage()
+  /** Backward-compat: existing components read `settingsStore.settings.*` */
+  const settings = computed(() => resolved.value)
 
-  async function load() {
+  async function load(): Promise<void> {
+    const settingsService = useSettingsService()
     isLoading.value = true
-    const stored = await read<AppSettings>(STORAGE_FILE, DEFAULT_SETTINGS)
-    settings.value = { ...DEFAULT_SETTINGS, ...stored }
-    isLoading.value = false
+    try {
+      let loadedGlobal: GlobalSettings
+      try {
+        loadedGlobal = await settingsService.loadGlobal()
+      } catch (err) {
+        console.warn('[settingsStore] Failed to load global settings, using defaults:', err)
+        loadedGlobal = { ...DEFAULT_GLOBAL }
+      }
+
+      let loadedWorkspace: WorkspaceSettings | null
+      try {
+        loadedWorkspace = await settingsService.loadWorkspace()
+      } catch (err) {
+        console.warn('[settingsStore] Failed to load workspace settings, using null:', err)
+        loadedWorkspace = null
+      }
+
+      global.value = loadedGlobal
+      workspace.value = loadedWorkspace
+      resolved.value = mergeSettings(loadedGlobal, loadedWorkspace)
+    } finally {
+      isLoading.value = false
+    }
   }
 
-  async function persist() {
-    await write(STORAGE_FILE, settings.value)
+  async function updateGlobal(partial: Partial<GlobalSettings>): Promise<void> {
+    const settingsService = useSettingsService()
+    try {
+      const updated = await settingsService.updateGlobal(partial)
+      global.value = updated
+      resolved.value = mergeSettings(updated, workspace.value)
+    } catch (err) {
+      console.error('[settingsStore] Failed to update global settings:', err)
+    }
   }
 
-  const save = debounce(persist, 300)
-
-  function updateSettings(updates: Partial<AppSettings>) {
-    Object.assign(settings.value, updates)
-    save()
+  async function updateWorkspace(partial: Partial<WorkspaceSettings>): Promise<void> {
+    const settingsService = useSettingsService()
+    try {
+      const updated = await settingsService.updateWorkspace(partial)
+      workspace.value = updated
+      resolved.value = mergeSettings(global.value, updated)
+    } catch (err) {
+      console.error('[settingsStore] Failed to update workspace settings:', err)
+    }
   }
 
-  function resetSettings() {
-    settings.value = { ...DEFAULT_SETTINGS }
-    save()
+  async function resetGlobal(): Promise<void> {
+    const settingsService = useSettingsService()
+    try {
+      const defaults = settingsService.getDefaults()
+      await settingsService.saveGlobal(defaults)
+      global.value = defaults
+      resolved.value = mergeSettings(defaults, workspace.value)
+    } catch (err) {
+      console.error('[settingsStore] Failed to reset global settings:', err)
+    }
+  }
+
+  async function reloadWorkspaceSettings(): Promise<void> {
+    const settingsService = useSettingsService()
+    try {
+      const loadedWorkspace = await settingsService.loadWorkspace()
+      workspace.value = loadedWorkspace
+      resolved.value = mergeSettings(global.value, loadedWorkspace)
+    } catch (err) {
+      console.warn('[settingsStore] Failed to reload workspace settings:', err)
+      workspace.value = null
+      resolved.value = mergeSettings(global.value, null)
+    }
+  }
+
+  /**
+   * @deprecated Use `updateGlobal` instead. Kept for backward compat with existing UI.
+   */
+  function updateSettings(updates: Partial<GlobalSettings>): void {
+    updateGlobal(updates)
   }
 
   return {
-    settings,
+    // State
+    global,
+    workspace,
+    resolved,
     isLoading,
+
+    // Backward-compat computed
+    settings,
+
+    // Actions
     load,
-    save,
+    updateGlobal,
+    updateWorkspace,
+    resetGlobal,
+    reloadWorkspaceSettings,
+
+    // Deprecated
     updateSettings,
-    resetSettings,
   }
 })

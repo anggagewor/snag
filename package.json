@@ -8,6 +8,7 @@
     "dev": "vite",
     "build": "vue-tsc --noEmit && vite build",
     "preview": "vite preview",
+    "test": "vitest --run",
     "tauri": "tauri"
   },
   "dependencies": {
@@ -37,8 +38,10 @@
     "@types/js-yaml": "^4.0.9",
     "@types/node": "^26.1.1",
     "@vitejs/plugin-vue": "^5.2.1",
+    "fast-check": "^4.9.0",
     "typescript": "~5.6.2",
     "vite": "^6.0.3",
+    "vitest": "^4.1.10",
     "vue-tsc": "^2.1.10"
   }
 }

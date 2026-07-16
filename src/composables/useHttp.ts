@@ -2,8 +2,8 @@ import { ref } from 'vue'
 
 import { useWorkspaceStore } from '@/stores/workspace'
 import { useSettingsStore } from '@/stores/settings'
-import type { RequestConfig, ResponseData } from '@/types/request'
-import type { KeyValuePair } from '@/types/common'
+import type { ResponseData } from '@/domain'
+import type { RequestDraft, KeyValuePairEditable } from '@/domain'
 
 const isTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window
 
@@ -26,7 +26,7 @@ export function useHttp() {
     return workspaceStore.resolveVariablesInString(str, collectionVariables)
   }
 
-  function buildUrl(url: string, params: KeyValuePair[], collectionVariables?: { key: string; value: string }[]): string {
+  function buildUrl(url: string, params: KeyValuePairEditable[], collectionVariables?: { key: string; value: string }[]): string {
     const resolvedUrl = resolve(url, collectionVariables)
     const enabledParams = params.filter((p) => p.enabled && p.key)
     if (enabledParams.length === 0) return resolvedUrl
@@ -39,16 +39,17 @@ export function useHttp() {
     return `${resolvedUrl}${separator}${queryString}`
   }
 
-  function buildHeaders(request: RequestConfig, collectionVariables?: { key: string; value: string }[]): Record<string, string> {
+  function buildHeaders(request: RequestDraft, collectionVariables?: { key: string; value: string }[]): Record<string, string> {
     const headers: Record<string, string> = {}
     const settingsStore = useSettingsStore()
 
     // Add default headers (from settings)
-    settingsStore.settings.defaultHeaders
-      .filter((h) => h.enabled)
-      .forEach((h) => {
-        headers[h.key] = h.value
-      })
+    if (settingsStore.settings.defaultHeaders) {
+      settingsStore.settings.defaultHeaders
+        .forEach((h) => {
+          headers[h.key] = h.value
+        })
+    }
 
     // Add snag-token (like postman-token)
     headers['Snag-Token'] = crypto.randomUUID()
@@ -66,29 +67,31 @@ export function useHttp() {
     } else if (request.auth.type === 'basic' && request.auth.basic) {
       const encoded = btoa(`${resolve(request.auth.basic.username, collectionVariables)}:${resolve(request.auth.basic.password, collectionVariables)}`)
       headers['Authorization'] = `Basic ${encoded}`
-    } else if (request.auth.type === 'api-key' && request.auth.apiKey?.addTo === 'header') {
+    } else if (request.auth.type === 'apikey' && request.auth.apiKey?.in === 'header') {
       headers[resolve(request.auth.apiKey.key, collectionVariables)] = resolve(request.auth.apiKey.value, collectionVariables)
     }
 
     return headers
   }
 
-  async function buildBody(request: RequestConfig, collectionVariables?: { key: string; value: string }[]): Promise<BodyInit | undefined> {
+  async function buildBody(request: RequestDraft, collectionVariables?: { key: string; value: string }[]): Promise<BodyInit | undefined> {
     const { body } = request
 
     if (body.type === 'none') return undefined
-    if (body.type === 'json' || body.type === 'raw') return resolve(body.raw || '', collectionVariables) || undefined
+    if (body.type === 'json' || body.type === 'text' || body.type === 'xml' || body.type === 'graphql') {
+      return resolve(body.content || '', collectionVariables) || undefined
+    }
 
-    if (body.type === 'x-www-form-urlencoded') {
-      const params = (body.urlencoded || [])
+    if (body.type === 'urlencoded') {
+      const params = (body.formData || [])
         .filter((p) => p.enabled && p.key)
         .map((p) => `${encodeURIComponent(resolve(p.key, collectionVariables))}=${encodeURIComponent(resolve(p.value, collectionVariables))}`)
         .join('&')
       return params || undefined
     }
 
-    const needsFileRead = (body.type === 'form-data' && body.formData?.some((f) => f.enabled && f.fieldType === 'file' && f.value))
-      || (body.type === 'binary' && body.binary)
+    const needsFileRead = (body.type === 'formdata' && body.formData?.some((f) => f.enabled && f.value))
+      || (body.type === 'binary' && body.binaryPath)
 
     let readFile: ((path: string) => Promise<Uint8Array>) | null = null
     if (needsFileRead && isTauri) {
@@ -96,35 +99,27 @@ export function useHttp() {
       readFile = fs.readFile
     }
 
-    if (body.type === 'form-data') {
+    if (body.type === 'formdata') {
       const formData = new FormData()
       const fields = body.formData || []
 
       for (const field of fields) {
         if (!field.enabled || !field.key) continue
-
-        if (field.fieldType === 'file' && field.value && readFile) {
-          const fileBytes = await readFile(field.value)
-          const fileName = field.fileName || field.value.split('/').pop() || 'file'
-          const blob = new Blob([fileBytes])
-          formData.append(resolve(field.key, collectionVariables), blob, fileName)
-        } else if (field.fieldType === 'text') {
-          formData.append(resolve(field.key, collectionVariables), resolve(field.value, collectionVariables))
-        }
+        formData.append(resolve(field.key, collectionVariables), resolve(field.value, collectionVariables))
       }
 
       return formData
     }
 
-    if (body.type === 'binary' && body.binary && readFile) {
-      const fileBytes = await readFile(body.binary)
-      return new Blob([fileBytes])
+    if (body.type === 'binary' && body.binaryPath && readFile) {
+      const fileBytes = await readFile(body.binaryPath)
+      return new Blob([fileBytes as BlobPart])
     }
 
     return undefined
   }
 
-  async function sendRequest(request: RequestConfig, collectionVariables?: { key: string; value: string }[]): Promise<ResponseData | null> {
+  async function sendRequest(request: RequestDraft, collectionVariables?: { key: string; value: string }[]): Promise<ResponseData | null> {
     // Abort any in-flight request
     if (abortController) {
       abortController.abort()
@@ -136,30 +131,17 @@ export function useHttp() {
     error.value = null
 
     const settingsStore = useSettingsStore()
-    const timeoutMs = settingsStore.settings.timeout * 1000
+    const timeoutMs = (settingsStore.settings.timeout ?? 30) * 1000
     const timeoutId = setTimeout(() => abortController?.abort(), timeoutMs)
 
     const startTime = performance.now()
 
     try {
-      // Resolve path params (:paramName → value) before building URL
-      let urlWithPathParams = request.url
-      if (request.pathParams && request.pathParams.length > 0) {
-        for (const param of request.pathParams) {
-          if (param.value) {
-            urlWithPathParams = urlWithPathParams.replace(
-              new RegExp(`:${param.key}\\b`, 'g'),
-              resolve(param.value, collectionVariables)
-            )
-          }
-        }
-      }
-
-      const url = buildUrl(urlWithPathParams, request.params, collectionVariables)
+      const url = buildUrl(request.url, request.params, collectionVariables)
 
       // Add api-key to query if configured
       let finalUrl = url
-      if (request.auth.type === 'api-key' && request.auth.apiKey?.addTo === 'query') {
+      if (request.auth.type === 'apikey' && request.auth.apiKey?.in === 'query') {
         const separator = finalUrl.includes('?') ? '&' : '?'
         finalUrl += `${separator}${encodeURIComponent(resolve(request.auth.apiKey.key, collectionVariables))}=${encodeURIComponent(resolve(request.auth.apiKey.value, collectionVariables))}`
       }
@@ -170,7 +152,7 @@ export function useHttp() {
       // Set content-type for JSON
       if (request.body.type === 'json' && !headers['Content-Type']) {
         headers['Content-Type'] = 'application/json'
-      } else if (request.body.type === 'x-www-form-urlencoded' && !headers['Content-Type']) {
+      } else if (request.body.type === 'urlencoded' && !headers['Content-Type']) {
         headers['Content-Type'] = 'application/x-www-form-urlencoded'
       }
       // Note: Don't set Content-Type for form-data — browser/fetch sets it with boundary
@@ -180,7 +162,7 @@ export function useHttp() {
         headers,
         body: body as BodyInit | undefined,
         signal,
-        dangerAcceptInvalidCerts: !settingsStore.settings.verifySSL,
+        dangerAcceptInvalidCerts: !(settingsStore.settings.validateSsl ?? true),
       })
 
       const endTime = performance.now()
@@ -210,7 +192,7 @@ export function useHttp() {
 
         // Detect SSL/certificate errors and give actionable hint
         const isSslError = /certificate|ssl|tls|self.signed|invalid.*cert/i.test(msg)
-        if (isSslError && settingsStore.settings.verifySSL) {
+        if (isSslError && (settingsStore.settings.validateSsl ?? true)) {
           error.value = `SSL certificate error: ${msg}\n\nHint: If using a local/self-signed cert, disable "Verify SSL" in Settings.`
         } else {
           error.value = msg
