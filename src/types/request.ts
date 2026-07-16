@@ -12,6 +12,11 @@ export interface AuthConfig {
   apiKey?: { key: string; value: string; addTo: 'header' | 'query' }
 }
 
+export interface PathParam {
+  key: string
+  value: string
+}
+
 export interface FormDataField {
   id: UUID
   key: string
@@ -36,6 +41,7 @@ export interface RequestConfig {
   url: string
   headers: KeyValuePair[]
   params: KeyValuePair[]
+  pathParams?: PathParam[]
   body: RequestBody
   auth: AuthConfig
   preRequestScript?: string
@@ -64,7 +70,18 @@ export function createEmptyRequest(): RequestConfig {
     url: '',
     headers: [],
     params: [],
+    pathParams: [],
     body: { type: 'none' },
     auth: { type: 'none' },
   }
+}
+
+/**
+ * Extract path parameter names from a URL pattern.
+ * Matches `:paramName` segments (e.g., /users/:id/posts/:postId)
+ */
+export function extractPathParams(url: string): string[] {
+  const matches = url.match(/:([a-zA-Z_]\w*)/g)
+  if (!matches) return []
+  return [...new Set(matches.map((m) => m.slice(1)))]
 }

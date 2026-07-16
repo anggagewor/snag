@@ -142,7 +142,20 @@ export function useHttp() {
     const startTime = performance.now()
 
     try {
-      const url = buildUrl(request.url, request.params)
+      // Resolve path params (:paramName → value) before building URL
+      let urlWithPathParams = request.url
+      if (request.pathParams && request.pathParams.length > 0) {
+        for (const param of request.pathParams) {
+          if (param.value) {
+            urlWithPathParams = urlWithPathParams.replace(
+              new RegExp(`:${param.key}\\b`, 'g'),
+              resolve(param.value)
+            )
+          }
+        }
+      }
+
+      const url = buildUrl(urlWithPathParams, request.params)
 
       // Add api-key to query if configured
       let finalUrl = url
@@ -192,8 +205,18 @@ export function useHttp() {
     } catch (err) {
       if (err instanceof DOMException && err.name === 'AbortError') {
         error.value = `Request timed out after ${settingsStore.settings.timeout}s`
+      } else if (err instanceof Error) {
+        const msg = err.message || String(err)
+
+        // Detect SSL/certificate errors and give actionable hint
+        const isSslError = /certificate|ssl|tls|self.signed|invalid.*cert/i.test(msg)
+        if (isSslError && settingsStore.settings.verifySSL) {
+          error.value = `SSL certificate error: ${msg}\n\nHint: If using a local/self-signed cert, disable "Verify SSL" in Settings.`
+        } else {
+          error.value = msg
+        }
       } else {
-        error.value = err instanceof Error ? err.message : 'Request failed'
+        error.value = `Request failed: ${String(err)}`
       }
       console.error('[useHttp] Request error:', err)
       return null

@@ -38,16 +38,25 @@ const methodOptions: SelectOption[] = [
 
 const currentMethod = computed(() => props.request.method)
 
-// Resolved URL preview
+// Resolved URL preview (includes env vars + path params)
 const resolvedUrl = computed(() => {
   if (!props.request.url) return ''
-  return environmentsStore.resolveVariablesInString(props.request.url)
+  let url = environmentsStore.resolveVariablesInString(props.request.url)
+  // Also resolve path params for preview
+  const pathParams = props.request.pathParams || []
+  for (const param of pathParams) {
+    if (param.value) {
+      const resolvedValue = environmentsStore.resolveVariablesInString(param.value)
+      url = url.replace(new RegExp(`:${param.key}\\b`, 'g'), resolvedValue)
+    }
+  }
+  return url
 })
 
 const hasUnresolvedVars = computed(() => {
   if (!props.request.url) return false
-  const resolved = environmentsStore.resolveVariablesInString(props.request.url)
-  return /\{\{\w+\}\}/.test(resolved)
+  const resolved = resolvedUrl.value
+  return /\{\{\w+\}\}/.test(resolved) || /:([a-zA-Z_]\w*)/.test(resolved)
 })
 
 function onMethodChange(value: string) {

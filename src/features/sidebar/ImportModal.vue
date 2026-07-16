@@ -104,6 +104,7 @@ async function handleImport() {
     }
 
     importText.value = ''
+    handleClose()
   } catch (err) {
     importError.value = err instanceof Error ? err.message : 'Failed to parse file'
     console.error('[Import]', err)
@@ -229,10 +230,9 @@ function autoDetectType() {
         class="px-3 py-1.5 text-sm rounded-md text-secondary hover:text-primary"
         @click="handleClose"
       >
-        {{ importSuccess ? 'Done' : 'Cancel' }}
+        Cancel
       </button>
       <button
-        v-if="!importSuccess"
         class="px-3 py-1.5 text-sm rounded-md bg-accent text-white hover:bg-accent-hover disabled:opacity-50"
         :disabled="!importText.trim() || isImporting"
         @click="handleImport"
