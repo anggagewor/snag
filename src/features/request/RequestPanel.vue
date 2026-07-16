@@ -6,7 +6,7 @@ import { useHistoryStore } from '@/stores/history'
 import { useEnvironmentsStore } from '@/stores/environments'
 import { useHttp } from '@/composables/useHttp'
 import { useScriptRunner } from '@/composables/useScriptRunner'
-import { HttpMethod } from '@/types/common'
+import { HttpMethod, ProtocolType } from '@/types/common'
 import type { Tab } from '@/stores/tabs'
 import type { TestResult } from '@/composables/useScriptRunner'
 import BaseSplitPane from '@/components/base/BaseSplitPane.vue'
@@ -40,6 +40,14 @@ function updateMethod(method: HttpMethod) {
 
 function updateUrl(url: string) {
   tabsStore.updateTabRequest(props.tab.id, { url })
+}
+
+function updateProtocol(protocol: ProtocolType) {
+  const tab = tabsStore.tabs.find((t) => t.id === props.tab.id)
+  if (tab) {
+    tab.protocol = protocol
+    tab.isDirty = true
+  }
 }
 
 async function handleSend() {
@@ -119,8 +127,10 @@ async function handleSend() {
     <RequestUrlBar
       :request="request"
       :is-loading="isLoading"
+      :protocol="tab.protocol"
       @update:method="updateMethod"
       @update:url="updateUrl"
+      @update:protocol="updateProtocol"
       @send="handleSend"
     />
 

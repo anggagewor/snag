@@ -10,6 +10,13 @@ export enum HttpMethod {
   OPTIONS = 'OPTIONS',
 }
 
+export enum ProtocolType {
+  REST = 'rest',
+  WEBSOCKET = 'websocket',
+  GRAPHQL = 'graphql',
+  GRPC = 'grpc',
+}
+
 export interface KeyValuePair {
   id: UUID
   key: string

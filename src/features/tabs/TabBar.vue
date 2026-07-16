@@ -5,6 +5,7 @@ import { Settings, Check, Save, Plus, Folder, FlaskConical, PanelLeft } from 'lu
 
 import { useTabsStore } from '@/stores/tabs'
 import { useCollectionsStore } from '@/stores/collections'
+import { ProtocolType } from '@/types/common'
 import type { UUID } from '@/types/common'
 import type { CollectionItem } from '@/types/collection'
 import type { Tab } from '@/stores/tabs'
@@ -120,7 +121,18 @@ function handleSaveAndClose() {
       >
         <!-- Request tab -->
         <template v-if="tab.type === 'request' && tab.request">
-          <BaseBadge :method="tab.request.method" />
+          <span
+            v-if="tab.protocol && tab.protocol !== ProtocolType.REST"
+            class="text-[9px] font-bold uppercase px-1 py-0.5 rounded mr-0.5"
+            :class="{
+              'bg-amber-500/10 text-amber-500': tab.protocol === ProtocolType.WEBSOCKET,
+              'bg-pink-500/10 text-pink-500': tab.protocol === ProtocolType.GRAPHQL,
+              'bg-blue-500/10 text-blue-500': tab.protocol === ProtocolType.GRPC,
+            }"
+          >
+            {{ tab.protocol === ProtocolType.WEBSOCKET ? 'WS' : tab.protocol === ProtocolType.GRAPHQL ? 'GQL' : 'gRPC' }}
+          </span>
+          <BaseBadge v-else :method="tab.request.method" />
         </template>
         <!-- Settings icon -->
         <template v-else-if="tab.type === 'settings'">

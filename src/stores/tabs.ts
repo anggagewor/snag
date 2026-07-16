@@ -5,8 +5,12 @@ import { useCollectionsStore } from '@/stores/collections'
 import { useStorage } from '@/composables/useStorage'
 import { debounce } from '@/utils/debounce'
 import type { UUID } from '@/types/common'
+import { ProtocolType } from '@/types/common'
 import type { CollectionItem } from '@/types/collection'
 import type { RequestConfig, ResponseData } from '@/types/request'
+import type { WebSocketConfig, WebSocketSession } from '@/types/websocket'
+import type { GraphQLConfig, GraphQLResponseData } from '@/types/graphql'
+import type { GrpcConfig, GrpcResponseData } from '@/types/grpc'
 import { createEmptyRequest } from '@/types/request'
 
 const STORAGE_FILE = 'tabs.json'
@@ -15,8 +19,16 @@ export interface Tab {
   id: UUID
   type: 'request' | 'settings' | 'environments'
   title: string
+  /** Protocol type — defaults to REST */
+  protocol: ProtocolType
   request?: RequestConfig
   response?: ResponseData | null
+  websocket?: WebSocketConfig
+  websocketSession?: WebSocketSession | null
+  graphql?: GraphQLConfig
+  graphqlResponse?: GraphQLResponseData | null
+  grpc?: GrpcConfig
+  grpcResponse?: GrpcResponseData | null
   isDirty: boolean
   /** Links this tab to a collection item (collectionId:itemId) */
   sourceId?: string
@@ -55,7 +67,11 @@ export const useTabsStore = defineStore('tabs', () => {
 
   async function load() {
     const data = await read<TabsSnapshot>(STORAGE_FILE, { tabs: [], activeTabId: null })
-    tabs.value = data.tabs
+    // Backward compat: ensure all tabs have protocol field
+    tabs.value = data.tabs.map((t) => ({
+      ...t,
+      protocol: t.protocol || ProtocolType.REST,
+    }))
     activeTabId.value = data.activeTabId
     isLoaded.value = true
   }
@@ -95,6 +111,7 @@ export const useTabsStore = defineStore('tabs', () => {
       id: crypto.randomUUID(),
       type: 'request',
       title: title || 'Untitled Request',
+      protocol: ProtocolType.REST,
       request: req,
       response: null,
       isDirty: false,
@@ -117,6 +134,7 @@ export const useTabsStore = defineStore('tabs', () => {
       id: crypto.randomUUID(),
       type: 'settings',
       title: 'Settings',
+      protocol: ProtocolType.REST,
       isDirty: false,
     }
     tabs.value.push(tab)
@@ -135,6 +153,7 @@ export const useTabsStore = defineStore('tabs', () => {
       id: crypto.randomUUID(),
       type: 'environments',
       title: 'Environments',
+      protocol: ProtocolType.REST,
       isDirty: false,
     }
     tabs.value.push(tab)

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 
-import { HttpMethod } from '@/types/common'
+import { HttpMethod, ProtocolType } from '@/types/common'
 import { useEnvironmentsStore } from '@/stores/environments'
 import { useTabsStore } from '@/stores/tabs'
 import type { RequestConfig } from '@/types/request'
@@ -14,17 +14,28 @@ import { parseCurl } from '@/utils/curl-parser'
 const props = defineProps<{
   request: RequestConfig
   isLoading?: boolean
+  protocol?: ProtocolType
 }>()
 
 const emit = defineEmits<{
   'update:method': [method: HttpMethod]
   'update:url': [url: string]
+  'update:protocol': [protocol: ProtocolType]
   send: []
 }>()
 
 const tabsStore = useTabsStore()
 
 const environmentsStore = useEnvironmentsStore()
+
+const protocolOptions: SelectOption[] = [
+  { label: 'REST', value: ProtocolType.REST, color: '#10b981' },
+  { label: 'WS', value: ProtocolType.WEBSOCKET, color: '#f59e0b' },
+  { label: 'GQL', value: ProtocolType.GRAPHQL, color: '#e535ab' },
+  { label: 'gRPC', value: ProtocolType.GRPC, color: '#3b82f6' },
+]
+
+const currentProtocol = computed(() => props.protocol || ProtocolType.REST)
 
 const methodOptions: SelectOption[] = [
   { label: 'GET', value: HttpMethod.GET, color: '#10b981' },
@@ -59,6 +70,10 @@ const hasUnresolvedVars = computed(() => {
   return /\{\{\w+\}\}/.test(resolved) || /:([a-zA-Z_]\w*)/.test(resolved)
 })
 
+function onProtocolChange(value: string) {
+  emit('update:protocol', value as ProtocolType)
+}
+
 function onMethodChange(value: string) {
   emit('update:method', value as HttpMethod)
 }
@@ -82,12 +97,41 @@ function onPaste(e: ClipboardEvent) {
     emit('update:url', parsed.url)
   }
 }
+
+const urlPlaceholder = computed(() => {
+  switch (currentProtocol.value) {
+    case ProtocolType.WEBSOCKET: return 'ws://localhost:8080/socket'
+    case ProtocolType.GRAPHQL: return 'https://api.example.com/graphql'
+    case ProtocolType.GRPC: return 'localhost:50051'
+    default: return 'Enter request URL...'
+  }
+})
+
+const sendLabel = computed(() => {
+  switch (currentProtocol.value) {
+    case ProtocolType.WEBSOCKET: return 'Connect'
+    case ProtocolType.GRAPHQL: return 'Query'
+    case ProtocolType.GRPC: return 'Invoke'
+    default: return 'Send'
+  }
+})
+const isNotReady = computed(() => currentProtocol.value !== ProtocolType.REST)
 </script>
 
 <template>
   <div class="flex items-center gap-2 p-3">
-    <!-- Method select -->
-    <div class="w-[130px] flex-shrink-0">
+    <!-- Protocol selector -->
+    <div class="w-[80px] flex-shrink-0">
+      <BaseSelect
+        :model-value="currentProtocol"
+        :options="protocolOptions"
+        size="md"
+        @update:model-value="onProtocolChange"
+      />
+    </div>
+
+    <!-- Method select (only for REST) -->
+    <div v-if="currentProtocol === 'rest'" class="w-[130px] flex-shrink-0">
       <BaseSelect
         :model-value="currentMethod"
         :options="methodOptions"
@@ -100,7 +144,7 @@ function onPaste(e: ClipboardEvent) {
     <div class="flex-1 relative" @paste="onPaste">
       <BaseUrlInput
         :model-value="request.url"
-        placeholder="Enter request URL..."
+        :placeholder="urlPlaceholder"
         @update:model-value="emit('update:url', $event)"
         @send="emit('send')"
       />
@@ -115,9 +159,17 @@ function onPaste(e: ClipboardEvent) {
       </div>
     </div>
 
+    <!-- Coming soon badge -->
+    <span
+      v-if="isNotReady"
+      class="flex-shrink-0 px-2 py-1 text-[10px] font-medium rounded-full bg-warning/10 text-warning border border-warning/20 whitespace-nowrap"
+    >
+      Coming Soon
+    </span>
+
     <!-- Send button -->
-    <BaseButton :loading="isLoading" @click="emit('send')">
-      Send
+    <BaseButton :loading="isLoading" :disabled="isNotReady" @click="emit('send')">
+      {{ sendLabel }}
     </BaseButton>
   </div>
 </template>
