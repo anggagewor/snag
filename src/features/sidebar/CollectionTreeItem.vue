@@ -14,6 +14,8 @@ import type { TreeContext } from './collectionTreeContext'
 const props = defineProps<{
   item: TreeNode
   collectionId: string
+  parentFolderId?: string | null
+  indexInParent: number
 }>()
 
 const workspaceStore = useWorkspaceStore()
@@ -78,6 +80,8 @@ async function duplicateRequest() {
   const duplicate = await workspaceStore.duplicateRequest(props.item.requestId as RequestId)
   ctx.requestNames.value.set(duplicate.id, duplicate.name)
   ctx.requestMethods.value.set(duplicate.id, duplicate.method)
+  // Reload collection since service now inserts the ref in the tree
+  await workspaceStore.reloadCollection(props.collectionId as CollectionId)
 }
 
 // Drag & Drop handlers
@@ -139,11 +143,12 @@ async function onDrop(e: DragEvent) {
     )
     ctx.expandedIds.value.add(props.item.id)
   } else {
-    const targetIndex = position === 'after' ? 1 : 0
+    // Drop before/after this item — insert relative to this item's position in parent
+    const targetIndex = position === 'after' ? props.indexInParent + 1 : props.indexInParent
     await workspaceStore.moveItem(
       props.collectionId as CollectionId,
       dragId as RequestId | FolderId,
-      null,
+      (props.parentFolderId as FolderId) ?? null,
       targetIndex,
     )
   }
@@ -250,10 +255,12 @@ function getRequestMethod(requestId: string): string {
         Empty folder
       </div>
       <CollectionTreeItem
-        v-for="child in item.children"
+        v-for="(child, childIndex) in item.children"
         :key="child.type === 'folder' ? child.id : child.requestId"
         :item="child"
         :collection-id="collectionId"
+        :parent-folder-id="item.id"
+        :index-in-parent="childIndex"
       />
     </div>
   </div>

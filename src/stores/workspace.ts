@@ -103,6 +103,15 @@ export const useWorkspaceStore = defineStore('workspace', () => {
       checkHealth()
 
       isReady.value = true
+    } catch (err) {
+      // Rollback to clean state if anything after openWorkspace fails
+      workspace.value = null
+      collections.value = []
+      environments.value = []
+      activeEnvironmentId.value = null
+      requestCache.value = new Map()
+      isReady.value = false
+      throw err
     } finally {
       isLoading.value = false
     }
@@ -159,8 +168,25 @@ export const useWorkspaceStore = defineStore('workspace', () => {
       const tabsStore = useTabsStore()
       tabsStore.clearAllTabs()
 
-      // 3. Open new workspace
-      await openWorkspace(path)
+      // 3. Open new workspace (inline — avoid double isLoading toggle)
+      const service = useWorkspaceService()
+      const registry = useRegistryService()
+
+      workspace.value = await service.openWorkspace(path)
+
+      await registry.registerWorkspace({
+        id: workspace.value.id,
+        name: workspace.value.name,
+        path,
+        lastOpenedAt: workspace.value.lastOpenedAt,
+      })
+
+      collections.value = await service.listCollections()
+      environments.value = await service.listEnvironments()
+      activeEnvironmentId.value = workspace.value.defaultEnvironment
+      requestCache.value = new Map()
+      checkHealth()
+      isReady.value = true
 
       // 4. Reload workspace settings
       const { useSettingsStore } = await import('@/stores/settings')

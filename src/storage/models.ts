@@ -99,6 +99,7 @@ export interface RequestFile extends FileHeader {
   readonly url: string
   readonly headers: readonly RequestFileKeyValue[]
   readonly params: readonly RequestFileKeyValue[]
+  readonly pathParams?: readonly RequestFileKeyValue[]
   readonly body: RequestFileBody
   readonly auth: RequestFileAuth
   readonly preRequest: string

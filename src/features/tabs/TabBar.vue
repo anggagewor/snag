@@ -93,9 +93,19 @@ async function handleSaveAndClose() {
   if (!tabId) return
   const tab = tabsStore.tabs.find((t) => t.id === tabId)
   if (tab && tab.type === 'request' && tab.isDirty) {
-    await tabsStore.saveTab(tab.id)
+    if (tab.sourceId) {
+      // Tab is linked to a collection — save directly
+      await tabsStore.saveTab(tab.id)
+      tabsStore.forceCloseTab(tabId)
+    } else {
+      // New unsaved tab — show save-to-collection modal
+      tabsStore.cancelCloseTab()
+      tabsStore.setActiveTab(tabId)
+      openSaveModal()
+    }
+  } else {
+    tabsStore.forceCloseTab(tabId)
   }
-  tabsStore.forceCloseTab(tabId)
 }
 </script>
 

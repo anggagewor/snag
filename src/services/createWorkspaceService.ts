@@ -142,6 +142,30 @@ export function createWorkspaceService(storage: StorageAdapter): WorkspaceServic
     })
   }
 
+  /**
+   * Insert a new node after a target request in the tree.
+   * Returns the new tree if found, or null if the target was not in this tree.
+   */
+  function insertAfterInTree(nodes: readonly TreeNode[], targetRequestId: RequestId, newNode: RequestRef): TreeNode[] | null {
+    for (let i = 0; i < nodes.length; i++) {
+      const node = nodes[i]
+      if (node.type === 'request' && node.requestId === targetRequestId) {
+        const result = [...nodes]
+        result.splice(i + 1, 0, newNode)
+        return result
+      }
+      if (node.type === 'folder') {
+        const childResult = insertAfterInTree(node.children, targetRequestId, newNode)
+        if (childResult) {
+          const result = [...nodes]
+          result[i] = { ...node, children: childResult }
+          return result
+        }
+      }
+    }
+    return null
+  }
+
   // ─── Interface Implementation ────────────────────────────────
 
   return {
@@ -434,6 +458,18 @@ export function createWorkspaceService(storage: StorageAdapter): WorkspaceServic
       }
 
       await storage.writeJson(requestPath(newId), requestToFile(duplicate))
+
+      // Add the duplicate ref to the collection tree (after the original)
+      const workspace = requireWorkspace()
+      for (const collectionId of workspace.collections) {
+        const collection = await this.getCollection(collectionId)
+        const insertedTree = insertAfterInTree(collection.items, id, { type: 'request', requestId: newId })
+        if (insertedTree) {
+          await this.saveCollection({ ...collection, items: insertedTree })
+          break
+        }
+      }
+
       return duplicate
     },
 

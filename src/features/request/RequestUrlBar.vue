@@ -48,10 +48,11 @@ const methodOptions: SelectOption[] = [
 
 const currentMethod = computed(() => props.request.method)
 
-// Resolved URL preview (includes env vars and path params)
+// Resolved URL preview (includes env vars, collection vars, and path params)
 const resolvedUrl = computed(() => {
   if (!props.request.url) return ''
-  let url = workspaceStore.resolveVariablesInString(props.request.url)
+  const collectionVars = tabsStore.activeTab?.collectionVariables
+  let url = workspaceStore.resolveVariablesInString(props.request.url, collectionVars)
   // Also resolve path params for the preview
   if (props.request.pathParams?.length) {
     for (const param of props.request.pathParams) {

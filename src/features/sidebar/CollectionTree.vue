@@ -270,10 +270,12 @@ async function saveVariables() {
         </div>
 
         <CollectionTreeItem
-          v-for="item in collection.items"
+          v-for="(item, itemIndex) in collection.items"
           :key="item.type === 'folder' ? item.id : item.requestId"
           :item="item"
           :collection-id="collection.id"
+          :parent-folder-id="null"
+          :index-in-parent="itemIndex"
         />
       </div>
     </div>

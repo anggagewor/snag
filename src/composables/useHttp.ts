@@ -22,6 +22,7 @@ export function useHttp() {
   const error = ref<string | null>(null)
 
   let abortController: AbortController | null = null
+  let activeTimeoutId: ReturnType<typeof setTimeout> | null = null
 
   function resolve(str: string, collectionVariables?: { key: string; value: string }[]): string {
     const workspaceStore = useWorkspaceStore()
@@ -67,7 +68,8 @@ export function useHttp() {
     if (request.auth.type === 'bearer' && request.auth.bearer) {
       headers['Authorization'] = `Bearer ${resolve(request.auth.bearer.token, collectionVariables)}`
     } else if (request.auth.type === 'basic' && request.auth.basic) {
-      const encoded = btoa(`${resolve(request.auth.basic.username, collectionVariables)}:${resolve(request.auth.basic.password, collectionVariables)}`)
+      const credentials = `${resolve(request.auth.basic.username, collectionVariables)}:${resolve(request.auth.basic.password, collectionVariables)}`
+      const encoded = btoa(String.fromCodePoint(...new TextEncoder().encode(credentials)))
       headers['Authorization'] = `Basic ${encoded}`
     } else if (request.auth.type === 'apikey' && request.auth.apiKey?.in === 'header') {
       headers[resolve(request.auth.apiKey.key, collectionVariables)] = resolve(request.auth.apiKey.value, collectionVariables)
@@ -122,19 +124,26 @@ export function useHttp() {
   }
 
   async function sendRequest(request: RequestDraft, collectionVariables?: { key: string; value: string }[]): Promise<ResponseData | null> {
-    // Abort any in-flight request
+    // Abort any in-flight request and clear its timeout
     if (abortController) {
       abortController.abort()
     }
-    abortController = new AbortController()
-    const { signal } = abortController
+    if (activeTimeoutId !== null) {
+      clearTimeout(activeTimeoutId)
+      activeTimeoutId = null
+    }
+
+    const controller = new AbortController()
+    abortController = controller
+    const { signal } = controller
 
     isLoading.value = true
     error.value = null
 
     const settingsStore = useSettingsStore()
     const timeoutMs = (settingsStore.settings.timeout ?? 30) * 1000
-    const timeoutId = setTimeout(() => abortController?.abort(), timeoutMs)
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs)
+    activeTimeoutId = timeoutId
 
     const startTime = performance.now()
 
@@ -243,7 +252,10 @@ export function useHttp() {
       return null
     } finally {
       clearTimeout(timeoutId)
-      abortController = null
+      activeTimeoutId = null
+      if (abortController === controller) {
+        abortController = null
+      }
       isLoading.value = false
     }
   }

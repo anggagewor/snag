@@ -145,6 +145,7 @@ export function requestFromFile(file: RequestFile): Request {
     url: file.url,
     headers: file.headers as KeyValuePair[],
     params: file.params as KeyValuePair[],
+    pathParams: file.pathParams as KeyValuePair[] | undefined,
     body: {
       type: file.body.type as BodyType,
       content: file.body.content,
@@ -191,6 +192,14 @@ export function requestToFile(request: Request): RequestFile {
       enabled: p.enabled,
       ...(p.description ? { description: p.description } : {}),
     })),
+    ...(request.pathParams?.length ? {
+      pathParams: request.pathParams.map(p => ({
+        key: p.key,
+        value: p.value,
+        enabled: p.enabled,
+        ...(p.description ? { description: p.description } : {}),
+      })),
+    } : {}),
     body: {
       type: request.body.type,
       content: request.body.content,

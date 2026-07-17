@@ -101,8 +101,20 @@ export function useScriptRunner() {
     }
 
     try {
-      const fn = new Function('snag', 'console', script)
-      fn(snag, console)
+      // Restrict global access by shadowing dangerous globals
+      const fn = new Function(
+        'snag', 'console',
+        'window', 'document', 'globalThis', 'self',
+        'fetch', 'XMLHttpRequest', 'localStorage', 'sessionStorage',
+        'location', 'navigator', 'eval',
+        script,
+      )
+      fn(
+        snag, console,
+        undefined, undefined, undefined, undefined,
+        undefined, undefined, undefined, undefined,
+        undefined, undefined, undefined,
+      )
     } catch (err) {
       return {
         logs,
@@ -133,9 +145,17 @@ function createExpect(actual: unknown) {
         throw new Error(`Expected ${JSON.stringify(actual)} to equal ${JSON.stringify(expected)}`)
       }
     },
-    toContain(expected: string) {
-      if (typeof actual !== 'string' || !actual.includes(expected)) {
-        throw new Error(`Expected "${actual}" to contain "${expected}"`)
+    toContain(expected: unknown) {
+      if (Array.isArray(actual)) {
+        if (!actual.includes(expected)) {
+          throw new Error(`Expected array to contain ${JSON.stringify(expected)}`)
+        }
+      } else if (typeof actual === 'string') {
+        if (!actual.includes(expected as string)) {
+          throw new Error(`Expected "${actual}" to contain "${expected}"`)
+        }
+      } else {
+        throw new Error(`Expected a string or array, got ${typeof actual}`)
       }
     },
     toBeTruthy() {
