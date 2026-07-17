@@ -60,6 +60,99 @@ For the full feature list and roadmap, see [FEATURES.md](./FEATURES.md).
 | HTTP | @tauri-apps/plugin-http |
 | Storage | JSON files via @tauri-apps/plugin-fs |
 
+## Prerequisites
+
+Sebelum build, pastikan system dependencies berikut sudah terinstall.
+
+### Ubuntu / Debian (22.04+)
+
+```bash
+# Build essentials & general tools
+sudo apt update
+sudo apt install -y \
+  build-essential \
+  curl \
+  wget \
+  file \
+  git
+
+# Rust toolchain
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+source "$HOME/.cargo/env"
+
+# Node.js (via NodeSource — v20 LTS recommended)
+curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+sudo apt install -y nodejs
+
+# Tauri 2 system dependencies (WebKitGTK, GTK, etc.)
+sudo apt install -y \
+  libwebkit2gtk-4.1-dev \
+  libgtk-3-dev \
+  libayatana-appindicator3-dev \
+  librsvg2-dev \
+  patchelf
+
+# TLS / crypto (needed by tauri-plugin-http with native-tls)
+sudo apt install -y \
+  libssl-dev \
+  pkg-config
+
+# Additional libs (GStreamer, Soup — pulled by WebKitGTK but good to have explicit)
+sudo apt install -y \
+  libglib2.0-dev \
+  libsoup-3.0-dev \
+  libjavascriptcoregtk-4.1-dev
+```
+
+> **Note:** Pada Ubuntu 26.04 (Plucky) semua package di atas tersedia di repo default. Untuk Ubuntu 22.04/24.04 juga compatible.
+
+### macOS (Homebrew)
+
+```bash
+# Xcode Command Line Tools (wajib untuk compiler + linker)
+xcode-select --install
+
+# Rust toolchain
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+source "$HOME/.cargo/env"
+
+# Node.js
+brew install node
+
+# Tauri CLI (optional — bisa juga pakai npx)
+cargo install tauri-cli
+```
+
+> macOS sudah bundle WebKit (WKWebView) secara native, jadi tidak perlu install GTK/WebKitGTK.
+
+### Windows
+
+```powershell
+# Install Visual Studio Build Tools (C++ workload)
+# Download dari https://visualstudio.microsoft.com/visual-cpp-build-tools/
+
+# Rust toolchain
+# Download dari https://rustup.rs
+
+# Node.js
+# Download dari https://nodejs.org (LTS)
+
+# WebView2 (biasanya sudah ada di Windows 10/11)
+# Kalau belum: https://developer.microsoft.com/en-us/microsoft-edge/webview2/
+```
+
+### Verify Installation
+
+```bash
+# Pastikan semua tool terdeteksi
+node --version    # >= 20.x
+npm --version     # >= 9.x
+rustc --version   # >= 1.77
+cargo --version
+```
+
+---
+
 ## Getting Started
 
 ```bash
