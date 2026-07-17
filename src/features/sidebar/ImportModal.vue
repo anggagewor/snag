@@ -23,6 +23,8 @@ const importText = ref('')
 const importError = ref<string | null>(null)
 const importSuccess = ref<string | null>(null)
 const isImporting = ref(false)
+const importProgress = ref(0)
+const importTotal = ref(0)
 
 const isTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window
 
@@ -99,6 +101,11 @@ async function handleImport() {
         collection = importOpenApiSpec(json)
       }
 
+      // Count total requests for progress
+      const totalRequests = countRequests(collection.items)
+      importTotal.value = totalRequests
+      importProgress.value = 0
+
       // Create collection in workspace and import items
       const created = await workspaceStore.createCollection(collection.name)
 
@@ -108,6 +115,12 @@ async function handleImport() {
       type FolderId = import('@/domain').FolderId
       type RequestId = import('@/domain').RequestId
       type Request = import('@/domain').Request
+
+      // Yield to UI between batches to avoid freezing
+      let batchCount = 0
+      function yieldToUI(): Promise<void> {
+        return new Promise(resolve => setTimeout(resolve, 0))
+      }
 
       async function importItems(items: any[]): Promise<TreeNode[]> {
         const nodes: TreeNode[] = []
@@ -143,6 +156,14 @@ async function handleImport() {
 
             // Write request file only (don't modify collection tree)
             await workspaceStore.saveRequest(req)
+            importProgress.value++
+
+            // Yield to UI every 10 requests to keep it responsive
+            batchCount++
+            if (batchCount % 10 === 0) {
+              await yieldToUI()
+            }
+
             nodes.push({ type: 'request', requestId })
           }
         }
@@ -154,11 +175,10 @@ async function handleImport() {
       // Set the collection tree to the imported folder structure
       await workspaceStore.saveCollectionTree(created.id as any, tree)
       await workspaceStore.reloadCollection(created.id as any)
-      importSuccess.value = `Imported "${collection.name}" with ${countRequests(collection.items)} requests`
+      importSuccess.value = `Imported "${collection.name}" with ${totalRequests} requests`
     }
 
     importText.value = ''
-    handleClose()
   } catch (err) {
     importError.value = err instanceof Error ? err.message : String(err || 'Failed to import')
     console.error('[Import]', err)
@@ -180,6 +200,8 @@ function handleClose() {
   importError.value = null
   importSuccess.value = null
   importText.value = ''
+  importProgress.value = 0
+  importTotal.value = 0
   emit('close')
 }
 
@@ -270,6 +292,20 @@ function autoDetectType() {
         />
       </div>
 
+      <!-- Progress bar -->
+      <div v-if="isImporting && importTotal > 0" class="space-y-1">
+        <div class="flex items-center justify-between text-xs text-secondary">
+          <span>Importing requests...</span>
+          <span class="font-mono">{{ importProgress }}/{{ importTotal }}</span>
+        </div>
+        <div class="w-full h-1.5 bg-border rounded-full overflow-hidden">
+          <div
+            class="h-full bg-accent rounded-full transition-all duration-150"
+            :style="{ width: `${Math.round((importProgress / importTotal) * 100)}%` }"
+          />
+        </div>
+      </div>
+
       <!-- Error / Success -->
       <div v-if="importError" class="px-3 py-2 bg-error/10 text-error text-xs rounded">
         {{ importError }}
@@ -284,9 +320,10 @@ function autoDetectType() {
         class="px-3 py-1.5 text-sm rounded-md text-secondary hover:text-primary"
         @click="handleClose"
       >
-        Cancel
+        {{ importSuccess ? 'Close' : 'Cancel' }}
       </button>
       <button
+        v-if="!importSuccess"
         class="px-3 py-1.5 text-sm rounded-md bg-accent text-white hover:bg-accent-hover disabled:opacity-50"
         :disabled="!importText.trim() || isImporting"
         @click="handleImport"

@@ -48,7 +48,8 @@ function updateRow(index: number, field: 'key' | 'value', value: string) {
 
 function addRow() {
   const updated = [...rows.value, { id: crypto.randomUUID(), key: '', value: '', enabled: true }]
-  syncRows(updated)
+  // Emit directly — don't run through syncRows which strips trailing empty rows
+  emit('update:modelValue', updated)
 }
 
 function removeRow(index: number) {
