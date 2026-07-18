@@ -4,6 +4,7 @@ import { useWorkspaceStore } from '@/stores/workspace'
 import { useSettingsStore } from '@/stores/settings'
 import { useTabsStore } from '@/stores/tabs'
 import { logAndNotify } from '@/services/logAndNotify'
+import { useCookieJarService } from '@/services/provider'
 import type { ResponseData } from '@/domain'
 import type { RequestDraft, KeyValuePairEditable } from '@/domain'
 
@@ -194,6 +195,19 @@ export function useHttp() {
       const headers = buildHeaders(effectiveRequest, collectionVariables)
       const body = await buildBody(request, collectionVariables)
 
+      // Attach cookies from cookie jar
+      try {
+        const cookieJar = useCookieJarService()
+        const cookieHeader = cookieJar.buildCookieHeader(finalUrl)
+        if (cookieHeader) {
+          headers['Cookie'] = headers['Cookie']
+            ? `${headers['Cookie']}; ${cookieHeader}`
+            : cookieHeader
+        }
+      } catch {
+        // Cookie jar not initialized (e.g., no workspace open) — skip
+      }
+
       // Set content-type for JSON
       if (request.body.type === 'json' && !headers['Content-Type']) {
         headers['Content-Type'] = 'application/json'
@@ -217,6 +231,14 @@ export function useHttp() {
       response.headers.forEach((value, key) => {
         responseHeaders[key] = value
       })
+
+      // Capture cookies from response
+      try {
+        const cookieJar = useCookieJarService()
+        await cookieJar.captureFromResponse(responseHeaders, finalUrl)
+      } catch {
+        // Cookie jar not initialized — skip
+      }
 
       return {
         status: response.status,

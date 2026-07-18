@@ -74,6 +74,15 @@
 - Command palette (Cmd+K) — search by name, URL, method, collection
 - Keyboard navigation (arrows, Enter, Escape)
 
+### Cookie Jar
+- Auto-capture cookies from Set-Cookie response headers
+- Auto-send matching cookies on subsequent requests (domain + path matching)
+- Per-workspace cookie storage (cookies.json)
+- Cookie viewer/editor panel (domain list, table view, delete individual/per-domain/all)
+- Handles Secure, HttpOnly, SameSite flags
+- Respects cookie expiration and Max-Age
+- Accessible via cookie icon in toolbar
+
 ### Code Generation
 - Generate code snippets from active request
 - Targets: JavaScript (Fetch, Axios), Python (requests), Go (net/http), Rust (reqwest), PHP (cURL), cURL
@@ -117,7 +126,6 @@
 
 | Feature | Description |
 |---------|-------------|
-| Cookie jar | Auto-capture & send cookies, cookie viewer/editor |
 | Request chaining | Use response values as input for next request |
 | OAuth 2.0 flow | Authorization Code, Client Credentials, PKCE, auto-refresh |
 | Proxy settings | HTTP/SOCKS proxy configuration |

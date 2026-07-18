@@ -18,7 +18,7 @@ import { requestToDraft, draftToRequest, isDirty } from '@/domain'
 
 export interface Tab {
   readonly id: string
-  readonly type: 'request' | 'settings' | 'environments'
+  readonly type: 'request' | 'settings' | 'environments' | 'cookies'
   title: string
   protocol: ProtocolType
   /** Reference to the persisted request (lazy-loaded from workspace) */
@@ -224,6 +224,25 @@ export const useTabsStore = defineStore('tabs', () => {
     return tab
   }
 
+  function openCookiesTab() {
+    const existing = tabs.value.find((t) => t.type === 'cookies')
+    if (existing) {
+      activeTabId.value = existing.id
+      return existing
+    }
+
+    const tab: Tab = {
+      id: crypto.randomUUID(),
+      type: 'cookies',
+      title: 'Cookies',
+      protocol: 'rest',
+      isDirty: false,
+    }
+    tabs.value.push(tab)
+    activeTabId.value = tab.id
+    return tab
+  }
+
   function setActiveTab(id: string) {
     activeTabId.value = id
   }
@@ -354,6 +373,7 @@ export const useTabsStore = defineStore('tabs', () => {
     recomputeDirty,
     openSettingsTab,
     openEnvironmentsTab,
+    openCookiesTab,
     setActiveTab,
     closeTab,
     forceCloseTab,

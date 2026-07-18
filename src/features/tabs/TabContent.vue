@@ -7,6 +7,7 @@ import { useTabsStore } from '@/stores/tabs'
 import RequestPanel from '@/features/request/RequestPanel.vue'
 import SettingsPanel from '@/features/settings/SettingsPanel.vue'
 import EnvironmentPanel from '@/features/environments/EnvironmentPanel.vue'
+import CookiePanel from '@/features/cookies/CookiePanel.vue'
 
 const tabsStore = useTabsStore()
 
@@ -57,5 +58,6 @@ watch(
     <RequestPanel v-else-if="tabsStore.activeTab.type === 'request'" :tab="tabsStore.activeTab" />
     <SettingsPanel v-else-if="tabsStore.activeTab.type === 'settings'" />
     <EnvironmentPanel v-else-if="tabsStore.activeTab.type === 'environments'" />
+    <CookiePanel v-else-if="tabsStore.activeTab.type === 'cookies'" />
   </div>
 </template>

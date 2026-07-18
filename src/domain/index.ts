@@ -60,6 +60,8 @@ export type {
   ProxyConfig,
 } from './Settings'
 
+export type { Cookie } from './Cookie'
+
 export type {
   RequestDraft,
   KeyValuePairEditable,

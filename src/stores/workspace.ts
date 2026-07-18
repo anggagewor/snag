@@ -96,6 +96,10 @@ export const useWorkspaceStore = defineStore('workspace', () => {
       environments.value = await service.listEnvironments()
       activeEnvironmentId.value = workspace.value.defaultEnvironment
 
+      // Load cookie jar
+      const { useCookieJarService } = await import('@/services/provider')
+      try { await useCookieJarService().load() } catch { /* non-critical */ }
+
       // Clear request cache
       requestCache.value = new Map()
 
@@ -185,6 +189,11 @@ export const useWorkspaceStore = defineStore('workspace', () => {
       environments.value = await service.listEnvironments()
       activeEnvironmentId.value = workspace.value.defaultEnvironment
       requestCache.value = new Map()
+
+      // Load cookie jar for new workspace
+      const { useCookieJarService } = await import('@/services/provider')
+      try { await useCookieJarService().load() } catch { /* non-critical */ }
+
       checkHealth()
       isReady.value = true
 

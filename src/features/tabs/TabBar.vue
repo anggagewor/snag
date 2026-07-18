@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, nextTick } from 'vue'
 
-import { Settings, Check, Save, Plus, Folder, FlaskConical, PanelLeft } from 'lucide-vue-next'
+import { Settings, Check, Save, Plus, Folder, FlaskConical, PanelLeft, Cookie } from 'lucide-vue-next'
 
 import { useTabsStore } from '@/stores/tabs'
 import { useWorkspaceStore } from '@/stores/workspace'
@@ -160,6 +160,10 @@ async function handleSaveAndClose() {
         <template v-else-if="tab.type === 'environments'">
           <FlaskConical class="w-3.5 h-3.5 text-muted" />
         </template>
+        <!-- Cookies icon -->
+        <template v-else-if="tab.type === 'cookies'">
+          <Cookie class="w-3.5 h-3.5 text-muted" />
+        </template>
 
         <!-- Tab title / rename input -->
         <template v-if="renamingTabId === tab.id">
@@ -221,6 +225,15 @@ async function handleSaveAndClose() {
           @click="tabsStore.openSettingsTab()"
         >
           <Settings class="w-4 h-4" />
+        </button>
+      </BaseTooltip>
+      <!-- Cookies -->
+      <BaseTooltip text="Cookie Jar" position="bottom">
+        <button
+          class="p-2 text-muted hover:text-primary hover:bg-surface-hover rounded transition-colors"
+          @click="tabsStore.openCookiesTab()"
+        >
+          <Cookie class="w-4 h-4" />
         </button>
       </BaseTooltip>
       <!-- Environment selector -->
