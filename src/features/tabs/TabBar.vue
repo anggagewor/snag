@@ -10,6 +10,7 @@ import type { CollectionId, FolderId } from '@/domain'
 import BaseTab from '@/components/base/BaseTab.vue'
 import BaseBadge from '@/components/base/BaseBadge.vue'
 import BaseModal from '@/components/base/BaseModal.vue'
+import BaseTooltip from '@/components/base/BaseTooltip.vue'
 import EnvironmentSelector from '@/features/environments/EnvironmentSelector.vue'
 
 const tabsStore = useTabsStore()
@@ -112,13 +113,14 @@ async function handleSaveAndClose() {
 <template>
   <div class="flex items-center h-[41px] border-b border-border bg-surface-alt">
     <!-- Sidebar toggle -->
-    <button
-      class="p-2 mx-0.5 text-muted hover:text-primary hover:bg-surface-hover rounded transition-colors flex-shrink-0"
-      title="Toggle Sidebar (Cmd+B)"
-      @click="emit('toggleSidebar')"
-    >
-      <PanelLeft class="w-4 h-4" />
-    </button>
+    <BaseTooltip text="Toggle Sidebar" shortcut="⌘B" position="bottom">
+      <button
+        class="p-2 mx-0.5 text-muted hover:text-primary hover:bg-surface-hover rounded transition-colors flex-shrink-0"
+        @click="emit('toggleSidebar')"
+      >
+        <PanelLeft class="w-4 h-4" />
+      </button>
+    </BaseTooltip>
 
     <!-- Scrollable tab area -->
     <div class="flex-1 flex items-center overflow-x-auto">
@@ -191,34 +193,36 @@ async function handleSaveAndClose() {
     </div>
 
     <!-- New tab button -->
-    <button
-      class="p-1.5 mx-0.5 text-muted hover:text-primary hover:bg-surface-hover rounded transition-colors flex-shrink-0"
-      title="New Request (Cmd+T)"
-      @click="tabsStore.openRequestTab()"
-    >
-      <Plus class="w-4 h-4" />
-    </button>
+    <BaseTooltip text="New Request" shortcut="⌘T" position="bottom">
+      <button
+        class="p-1.5 mx-0.5 text-muted hover:text-primary hover:bg-surface-hover rounded transition-colors flex-shrink-0"
+        @click="tabsStore.openRequestTab()"
+      >
+        <Plus class="w-4 h-4" />
+      </button>
+    </BaseTooltip>
 
     <!-- Right actions -->
     <div class="flex items-center gap-0.5 px-2 flex-shrink-0 border-l border-border">
       <!-- Save active tab -->
-      <button
-        v-if="tabsStore.activeTab?.type === 'request'"
-        class="p-2 text-muted hover:text-primary hover:bg-surface-hover rounded transition-colors"
-        :class="{ 'text-warning': tabsStore.activeTab?.isDirty }"
-        :title="tabsStore.activeTab?.sourceId ? 'Save (Cmd+S)' : 'Save to Collection (Cmd+S)'"
-        @click="tabsStore.activeTab && handleSave(tabsStore.activeTab)"
-      >
-        <Save class="w-4 h-4" />
-      </button>
+      <BaseTooltip v-if="tabsStore.activeTab?.type === 'request'" text="Save" shortcut="⌘S" position="bottom">
+        <button
+          class="p-2 text-muted hover:text-primary hover:bg-surface-hover rounded transition-colors"
+          :class="{ 'text-warning': tabsStore.activeTab?.isDirty }"
+          @click="tabsStore.activeTab && handleSave(tabsStore.activeTab)"
+        >
+          <Save class="w-4 h-4" />
+        </button>
+      </BaseTooltip>
       <!-- Settings -->
-      <button
-        class="p-2 text-muted hover:text-primary hover:bg-surface-hover rounded transition-colors"
-        title="Settings"
-        @click="tabsStore.openSettingsTab()"
-      >
-        <Settings class="w-4 h-4" />
-      </button>
+      <BaseTooltip text="Settings" position="bottom">
+        <button
+          class="p-2 text-muted hover:text-primary hover:bg-surface-hover rounded transition-colors"
+          @click="tabsStore.openSettingsTab()"
+        >
+          <Settings class="w-4 h-4" />
+        </button>
+      </BaseTooltip>
       <!-- Environment selector -->
       <div class="ml-1">
         <EnvironmentSelector />

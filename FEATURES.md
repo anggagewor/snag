@@ -74,6 +74,16 @@
 - Command palette (Cmd+K) — search by name, URL, method, collection
 - Keyboard navigation (arrows, Enter, Escape)
 
+### Code Generation
+- Generate code snippets from active request
+- Targets: JavaScript (Fetch, Axios), Python (requests), Go (net/http), Rust (reqwest), PHP (cURL), cURL
+- Modal with language selector + copy to clipboard
+
+### Folder-Level Auth
+- Folders can define auth (Bearer, Basic, API Key)
+- Requests inherit auth from nearest parent folder when set to "No Auth"
+- Resolution walks up the tree: request → folder → parent folder
+
 ### Settings
 - Theme: Light / Dark / System
 - Default HTTP method, timeout, follow redirects, verify SSL
@@ -85,7 +95,8 @@
 - Sidebar collapsible (Cmd+B)
 - Resizable split pane (request/response)
 - HTTP method & protocol color coding
-- CodeMirror integration
+- CodeMirror integration with search (Cmd+F in any editor)
+- Bulk edit mode for headers and params (Table / Bulk toggle)
 - Custom base components (Button, Input, Select, Dropdown, Modal, etc.)
 
 ### Storage
@@ -109,12 +120,9 @@
 | Cookie jar | Auto-capture & send cookies, cookie viewer/editor |
 | Request chaining | Use response values as input for next request |
 | OAuth 2.0 flow | Authorization Code, Client Credentials, PKCE, auto-refresh |
-| Response body search | Cmd+F in response body |
-| Code generation | Generate snippets (JS, Python, Go, Rust, etc.) |
 | Proxy settings | HTTP/SOCKS proxy configuration |
 | Certificate management | Client certificate (mTLS) |
 | Variable scopes | Global → Environment → Collection → Request hierarchy |
-| Bulk edit mode | Raw text editing for headers/params |
 
 ### Protocol Implementations (v2+)
 
@@ -136,7 +144,6 @@
 | Plugin system | Extension API for auth, importers, body types |
 | Import: Insomnia/HAR | Additional import formats |
 | Export: OpenAPI | Generate spec from collection |
-| Folder-level auth | Inherit auth from folder/collection |
 | Request examples | Multiple saved examples per request |
 | CLI companion | Run collections headless (CI/CD) |
 | Mock server | Local mock from OpenAPI spec |

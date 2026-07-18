@@ -11,7 +11,7 @@ import { xml } from '@codemirror/lang-xml'
 import { oneDark } from '@codemirror/theme-one-dark'
 import { syntaxHighlighting, defaultHighlightStyle, bracketMatching, foldGutter } from '@codemirror/language'
 import { autocompletion, closeBrackets } from '@codemirror/autocomplete'
-import { highlightSelectionMatches, searchKeymap } from '@codemirror/search'
+import { highlightSelectionMatches, searchKeymap, search } from '@codemirror/search'
 
 export type EditorLanguage = 'json' | 'javascript' | 'html' | 'xml' | 'text'
 
@@ -58,6 +58,7 @@ function buildExtensions() {
     foldGutter(),
     autocompletion(),
     highlightSelectionMatches(),
+    search({ top: true }),
     syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
     keymap.of([...defaultKeymap, ...searchKeymap, indentWithTab]),
     getLanguageExtension(props.language),

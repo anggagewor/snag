@@ -123,7 +123,7 @@ export function useHttp() {
     return undefined
   }
 
-  async function sendRequest(request: RequestDraft, collectionVariables?: { key: string; value: string }[]): Promise<ResponseData | null> {
+  async function sendRequest(request: RequestDraft, collectionVariables?: { key: string; value: string }[], sourceId?: string): Promise<ResponseData | null> {
     // Abort any in-flight request and clear its timeout
     if (abortController) {
       abortController.abort()
@@ -166,14 +166,32 @@ export function useHttp() {
 
       const url = buildUrl(requestUrl, request.params, collectionVariables)
 
-      // Add api-key to query if configured
-      finalUrl = url
-      if (request.auth.type === 'apikey' && request.auth.apiKey?.in === 'query') {
-        const separator = finalUrl.includes('?') ? '&' : '?'
-        finalUrl += `${separator}${encodeURIComponent(resolve(request.auth.apiKey.key, collectionVariables))}=${encodeURIComponent(resolve(request.auth.apiKey.value, collectionVariables))}`
+      // Resolve inherited auth from folder/collection if request has no auth
+      let effectiveAuth = request.auth
+      if (request.auth.type === 'none' && sourceId) {
+        const workspaceStore = useWorkspaceStore()
+        const inherited = workspaceStore.resolveInheritedAuth(sourceId)
+        if (inherited) {
+          effectiveAuth = {
+            type: inherited.type as typeof request.auth.type,
+            basic: inherited.basic ? { ...inherited.basic } : undefined,
+            bearer: inherited.bearer ? { ...inherited.bearer } : undefined,
+            apiKey: inherited.apiKey ? { ...inherited.apiKey } : undefined,
+          }
+        }
       }
 
-      const headers = buildHeaders(request, collectionVariables)
+      // Use a shallow copy with effective auth for header/url building
+      const effectiveRequest = { ...request, auth: effectiveAuth }
+
+      // Add api-key to query if configured
+      finalUrl = url
+      if (effectiveAuth.type === 'apikey' && effectiveAuth.apiKey?.in === 'query') {
+        const separator = finalUrl.includes('?') ? '&' : '?'
+        finalUrl += `${separator}${encodeURIComponent(resolve(effectiveAuth.apiKey.key, collectionVariables))}=${encodeURIComponent(resolve(effectiveAuth.apiKey.value, collectionVariables))}`
+      }
+
+      const headers = buildHeaders(effectiveRequest, collectionVariables)
       const body = await buildBody(request, collectionVariables)
 
       // Set content-type for JSON
@@ -218,7 +236,7 @@ export function useHttp() {
         const message = `Request timed out after ${settingsStore.settings.timeout}s`
         error.value = message
 
-        const retryFn = () => sendRequest(request, collectionVariables)
+        const retryFn = () => sendRequest(request, collectionVariables, sourceId)
         logAndNotify('useHttp', message, metadata, {
           type: 'warn',
           actionLabel: 'Retry',

@@ -7,6 +7,7 @@ import { useWorkspaceStore } from '@/stores/workspace'
 import { useTabsStore } from '@/stores/tabs'
 import type { CollectionId } from '@/domain'
 import BaseDropdown from '@/components/base/BaseDropdown.vue'
+import BaseTooltip from '@/components/base/BaseTooltip.vue'
 import CollectionTree from './CollectionTree.vue'
 import ImportModal from './ImportModal.vue'
 import HistoryPanel from '@/features/history/HistoryPanel.vue'
@@ -80,34 +81,37 @@ async function handleNewFolderInCollection() {
     <div class="flex items-center justify-between px-3 h-[41px] border-b border-border">
       <!-- Section tabs -->
       <div class="flex items-center gap-0.5">
-        <button
-          class="px-2 py-1 text-xs rounded transition-colors"
-          :class="activeSection === 'collections' ? 'bg-accent/10 text-accent font-medium' : 'text-muted hover:text-primary'"
-          title="Collections"
-          @click="activeSection = 'collections'"
-        >
-          <Folder class="w-4 h-4" />
-        </button>
-        <button
-          class="px-2 py-1 text-xs rounded transition-colors"
-          :class="activeSection === 'history' ? 'bg-accent/10 text-accent font-medium' : 'text-muted hover:text-primary'"
-          title="History"
-          @click="activeSection = 'history'"
-        >
-          <Clock class="w-4 h-4" />
-        </button>
-        <button
-          class="px-2 py-1 text-xs rounded transition-colors relative"
-          :class="activeSection === 'envs' ? 'bg-accent/10 text-accent font-medium' : 'text-muted hover:text-primary'"
-          title="Environments"
-          @click="activeSection = 'envs'"
-        >
-          <FlaskConical class="w-4 h-4" />
-          <span
-            v-if="workspaceStore.activeEnvironmentId"
-            class="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-success"
-          />
-        </button>
+        <BaseTooltip text="Collections" position="bottom">
+          <button
+            class="px-2 py-1 text-xs rounded transition-colors"
+            :class="activeSection === 'collections' ? 'bg-accent/10 text-accent font-medium' : 'text-muted hover:text-primary'"
+            @click="activeSection = 'collections'"
+          >
+            <Folder class="w-4 h-4" />
+          </button>
+        </BaseTooltip>
+        <BaseTooltip text="History" position="bottom">
+          <button
+            class="px-2 py-1 text-xs rounded transition-colors"
+            :class="activeSection === 'history' ? 'bg-accent/10 text-accent font-medium' : 'text-muted hover:text-primary'"
+            @click="activeSection = 'history'"
+          >
+            <Clock class="w-4 h-4" />
+          </button>
+        </BaseTooltip>
+        <BaseTooltip text="Environments" shortcut="⌘E" position="bottom">
+          <button
+            class="px-2 py-1 text-xs rounded transition-colors relative"
+            :class="activeSection === 'envs' ? 'bg-accent/10 text-accent font-medium' : 'text-muted hover:text-primary'"
+            @click="activeSection = 'envs'"
+          >
+            <FlaskConical class="w-4 h-4" />
+            <span
+              v-if="workspaceStore.activeEnvironmentId"
+              class="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-success"
+            />
+          </button>
+        </BaseTooltip>
       </div>
 
       <!-- Actions -->

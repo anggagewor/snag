@@ -3,10 +3,6 @@
  *
  * Delegates persistence to SettingsService.
  * Merges global + workspace settings into a reactive ResolvedSettings.
- *
- * Backward compat:
- * - `settings` computed maps to `resolved` so existing UI keeps working
- * - `updateSettings` deprecated alias maps to `updateGlobal`
  */
 
 import { defineStore } from 'pinia'
@@ -134,13 +130,6 @@ export const useSettingsStore = defineStore('settings', () => {
     }
   }
 
-  /**
-   * @deprecated Use `updateGlobal` instead. Kept for backward compat with existing UI.
-   */
-  function updateSettings(updates: Partial<GlobalSettings>): void {
-    updateGlobal(updates)
-  }
-
   return {
     // State
     global,
@@ -157,8 +146,5 @@ export const useSettingsStore = defineStore('settings', () => {
     updateWorkspace,
     resetGlobal,
     reloadWorkspaceSettings,
-
-    // Deprecated
-    updateSettings,
   }
 })

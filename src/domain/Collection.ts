@@ -19,6 +19,14 @@ export interface Folder {
   readonly id: FolderId
   readonly name: string
   readonly children: readonly TreeNode[]
+  readonly auth?: FolderAuth
+}
+
+export interface FolderAuth {
+  readonly type: 'none' | 'bearer' | 'basic' | 'apikey'
+  readonly basic?: { readonly username: string; readonly password: string }
+  readonly bearer?: { readonly token: string }
+  readonly apiKey?: { readonly key: string; readonly value: string; readonly in: 'header' | 'query' }
 }
 
 export type TreeNode = Folder | RequestRef

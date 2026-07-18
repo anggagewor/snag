@@ -34,6 +34,9 @@ export interface HistoryService {
   /** Get total count matching filter. */
   count(filter?: HistoryFilter): Promise<number>
 
+  /** Remove a single entry by ID. */
+  removeById(id: string): Promise<boolean>
+
   /** Clear history entries older than date. */
   clearBefore(date: string): Promise<number>
 

@@ -393,6 +393,48 @@ export const useWorkspaceStore = defineStore('workspace', () => {
     })
   }
 
+  /**
+   * Resolve inherited auth for a request.
+   * Walks up the collection tree to find the nearest folder/collection with auth configured.
+   * Returns null if no inherited auth is found.
+   */
+  function resolveInheritedAuth(sourceId?: string): import('@/domain').FolderAuth | null {
+    if (!sourceId) return null
+
+    const [collectionId, requestId] = sourceId.split(':')
+    const collection = collections.value.find(c => c.id === collectionId)
+    if (!collection) return null
+
+    type TreeNodeType = import('@/domain').TreeNode
+
+    // Walk the tree to find the path to the request
+    function findPath(nodes: readonly TreeNodeType[], targetId: string, path: TreeNodeType[]): TreeNodeType[] | null {
+      for (const node of nodes) {
+        if (node.type === 'request' && node.requestId === targetId) {
+          return path
+        }
+        if (node.type === 'folder') {
+          const result = findPath(node.children, targetId, [...path, node])
+          if (result) return result
+        }
+      }
+      return null
+    }
+
+    const folderPath = findPath(collection.items, requestId, [])
+    if (!folderPath) return null
+
+    // Walk from closest folder up to root, find first with auth
+    for (let i = folderPath.length - 1; i >= 0; i--) {
+      const node = folderPath[i]
+      if (node.type === 'folder' && node.auth && node.auth.type !== 'none') {
+        return node.auth
+      }
+    }
+
+    return null
+  }
+
   // ─── Health ────────────────────────────────────────────────────
 
   async function checkHealth(): Promise<void> {
@@ -466,6 +508,7 @@ export const useWorkspaceStore = defineStore('workspace', () => {
     deleteEnvironment,
     setActiveEnvironment,
     resolveVariablesInString,
+    resolveInheritedAuth,
 
     // Health
     checkHealth,

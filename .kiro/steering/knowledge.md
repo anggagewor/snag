@@ -276,9 +276,11 @@ console.error(...args)
 
 ## State Ownership
 
-Collections Store
-- owns collections
-- owns folder tree
+Workspace Store
+- owns workspace lifecycle
+- owns collections & folder tree
+- owns requests (cache + persistence)
+- owns environments & variable resolution
 - owns moveItem (drag & drop)
 
 Tabs Store
@@ -289,15 +291,10 @@ Tabs Store
 - owns protocol per tab
 
 History Store
-- owns request history
-
-Environment Store
-- owns environments
-- owns variables
-- owns variable resolution (accepts optional collection variables)
+- owns request history (delegates to HistoryService)
 
 Settings Store
-- owns user preferences
+- owns user preferences (delegates to SettingsService)
 
 Components never own application state.
 
@@ -370,10 +367,10 @@ Script API extensions
 → composables/useScriptRunner.ts
 
 New protocol implementations
-→ types/{protocol}.ts + features/{protocol}/ + composables/use{Protocol}.ts
+→ domain/protocols.ts + features/{protocol}/ + composables/use{Protocol}.ts
 
 Persistence
-→ composables/useStorage.ts
+→ storage/StorageAdapter.ts
 
 ## File Structure
 
@@ -404,17 +401,14 @@ src/
 │   ├── scratch.ts             # Scratch Pad init
 │   └── startup.ts             # App startup orchestrator
 ├── stores/                # Pinia stores (imports domain + services)
-│   ├── workspace.ts       # NEW: workspace-aware store
-│   ├── collections.ts     # LEGACY: will be removed after UI migration
-│   ├── environments.ts    # LEGACY
-│   ├── history.ts         # LEGACY
-│   ├── settings.ts        # LEGACY
-│   └── tabs.ts            # Will be updated to use workspace store
+│   ├── workspace.ts       # Workspace-aware store (collections, requests, environments)
+│   ├── history.ts         # History store (delegates to HistoryService)
+│   ├── settings.ts        # Settings store (delegates to SettingsService)
+│   └── tabs.ts            # Tab management store
 ├── components/base/       # Generic, reusable UI components
 ├── composables/           # Shared reactive logic
 │   ├── useHttp.ts         # REST request execution
 │   ├── useScriptRunner.ts # Pre-request & test script sandbox
-│   ├── useStorage.ts      # LEGACY (replaced by StorageAdapter)
 │   ├── useKeyboard.ts     # Global keyboard shortcuts
 │   └── useTheme.ts        # Theme management
 ├── features/              # Feature-specific components
@@ -427,7 +421,6 @@ src/
 │   ├── sidebar/           # Collection tree, import modal
 │   └── tabs/              # Tab bar, tab content router
 ├── layouts/               # App layout shells
-├── types/                 # LEGACY type definitions (being replaced by domain/)
 ├── utils/                 # Pure utility functions
 └── assets/styles/         # Global styles, Tailwind config
 ```
@@ -439,6 +432,6 @@ src/
 - Proxy settings
 - Cookie jar management
 - Request chaining (use response from A as input to B)
-- WebSocket panel (types ready at `src/types/websocket.ts`)
-- GraphQL panel with schema introspection (types ready at `src/types/graphql.ts`)
-- gRPC panel with proto loading (types ready at `src/types/grpc.ts`)
+- WebSocket panel (types ready at `src/domain/protocols.ts`)
+- GraphQL panel with schema introspection (types ready at `src/domain/protocols.ts`)
+- gRPC panel with proto loading (types ready at `src/domain/protocols.ts`)

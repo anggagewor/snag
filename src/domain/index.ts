@@ -31,6 +31,7 @@ export type {
   TreeNode,
   Folder,
   RequestRef,
+  FolderAuth,
 } from './Collection'
 
 export type {

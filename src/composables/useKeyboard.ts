@@ -14,9 +14,17 @@ export function useKeyboard() {
     if (!tab || tab.type !== 'request' || !tab.requestDraft?.url) return
 
     const draft = tab.requestDraft
-    const response = await sendRequest(draft, tab.collectionVariables)
+    const response = await sendRequest(draft, tab.collectionVariables, tab.sourceId)
     tabsStore.updateTabResponse(tab.id, response)
-    historyStore.addEntry(draft, response)
+    if (response) {
+      historyStore.recordEntry({
+        method: (draft.method ?? 'GET') as import('@/domain').HttpMethod,
+        url: response.requestUrl ?? draft.url ?? '',
+        status: response.status,
+        duration: response.time ?? 0,
+        responseSize: response.size ?? 0,
+      })
+    }
   }
 
   function handleKeyDown(e: KeyboardEvent) {

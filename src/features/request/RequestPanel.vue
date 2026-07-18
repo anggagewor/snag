@@ -10,12 +10,14 @@ import type { Tab } from '@/stores/tabs'
 import type { HttpMethod, ProtocolType } from '@/domain'
 import type { TestResult } from '@/composables/useScriptRunner'
 import BaseSplitPane from '@/components/base/BaseSplitPane.vue'
+import BaseTooltip from '@/components/base/BaseTooltip.vue'
 import RequestUrlBar from './RequestUrlBar.vue'
 import RequestParams from './RequestParams.vue'
 import RequestHeaders from './RequestHeaders.vue'
 import RequestBody from './RequestBody.vue'
 import RequestAuth from './RequestAuth.vue'
 import RequestScripts from './RequestScripts.vue'
+import CodeGeneratorModal from './CodeGeneratorModal.vue'
 import ResponsePanel from '@/features/response/ResponsePanel.vue'
 
 const props = defineProps<{
@@ -31,7 +33,7 @@ const { runPreRequestScript, runTestScript } = useScriptRunner()
 const activeSection = ref<'params' | 'headers' | 'body' | 'auth' | 'scripts'>('params')
 const scriptLogs = ref<string[]>([])
 const testResults = ref<TestResult[]>([])
-
+const showCodeGen = ref(false)
 const request = computed(() => props.tab.requestDraft!)
 
 function updateMethod(method: HttpMethod) {
@@ -94,9 +96,51 @@ async function handleSend() {
     }
   }
 
-  const response = await sendRequest(request.value, collectionVars)
+  const response = await sendRequest(request.value, collectionVars, props.tab.sourceId)
   tabsStore.updateTabResponse(props.tab.id, response)
-  historyStore.addEntry(request.value, response)
+  if (response) {
+    historyStore.recordEntry({
+      method: request.value.method,
+      url: response.requestUrl ?? request.value.url,
+      status: response.status,
+      duration: response.time ?? 0,
+      responseSize: response.size ?? 0,
+      request: {
+        headers: request.value.headers
+          .filter((h) => h.enabled && h.key)
+          .map((h) => ({ key: h.key, value: h.value, enabled: h.enabled })),
+        params: request.value.params
+          .filter((p) => p.enabled && p.key)
+          .map((p) => ({ key: p.key, value: p.value, enabled: p.enabled })),
+        body: {
+          type: request.value.body.type ?? 'none',
+          content: request.value.body.content ?? '',
+          ...(request.value.body.formData && {
+            formData: request.value.body.formData
+              .filter((f) => f.enabled && f.key)
+              .map((f) => ({ key: f.key, value: f.value, enabled: f.enabled })),
+          }),
+        },
+        auth: {
+          type: request.value.auth.type ?? 'none',
+          ...(request.value.auth.basic && { basic: { ...request.value.auth.basic } }),
+          ...(request.value.auth.bearer && { bearer: { ...request.value.auth.bearer } }),
+          ...(request.value.auth.apiKey && { apiKey: { ...request.value.auth.apiKey } }),
+        },
+      },
+      response: {
+        status: response.status,
+        statusText: response.statusText ?? '',
+        headers: response.headers ?? {},
+        body: response.body ?? '',
+        size: response.size ?? 0,
+        time: response.time ?? 0,
+        ...(response.requestHeaders && { requestHeaders: response.requestHeaders }),
+        ...(response.requestUrl && { requestUrl: response.requestUrl }),
+        ...(response.requestMethod && { requestMethod: response.requestMethod }),
+      },
+    })
+  }
 
   // Run test script
   if (request.value.tests && response) {
@@ -164,6 +208,16 @@ async function handleSend() {
                 </span>
               </span>
             </button>
+
+            <!-- Code Generation button -->
+            <BaseTooltip text="Generate Code" position="bottom">
+              <button
+                class="ml-auto px-2 py-1 text-[10px] text-secondary hover:text-accent transition-colors"
+                @click="showCodeGen = true"
+              >
+                &lt;/&gt; Code
+              </button>
+            </BaseTooltip>
           </div>
 
           <!-- Section content -->
@@ -181,5 +235,12 @@ async function handleSend() {
         <ResponsePanel :response="tab.response" :is-loading="isLoading" :error="error" @cancel="cancelRequest" />
       </template>
     </BaseSplitPane>
+
+    <!-- Code Generation Modal -->
+    <CodeGeneratorModal
+      :open="showCodeGen"
+      :request="tab.requestDraft ?? null"
+      @close="showCodeGen = false"
+    />
   </div>
 </template>

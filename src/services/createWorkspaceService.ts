@@ -635,19 +635,194 @@ export function createWorkspaceService(storage: StorageAdapter): WorkspaceServic
 
     // ─── Import / Export ───────────────────────────────────────
 
-    async previewImport(_source: ImportSource): Promise<ImportPreview> {
-      // TODO: Implement per format (postman, openapi, curl)
-      throw new Error('Import not yet implemented in workspace service.')
+    async previewImport(source: ImportSource): Promise<ImportPreview> {
+      const { importPostmanCollection } = await import('../utils/import-postman')
+      const { importOpenApiSpec } = await import('../utils/import-openapi')
+      const { parseCurl } = await import('../utils/curl-parser')
+
+      let collectionName = ''
+      let requests: ImportPreview['requests'] = []
+      let folderCount = 0
+
+      function countItems(items: { type: string; name?: string; request?: { method?: string; url?: string }; items?: unknown[] }[]): void {
+        for (const item of items) {
+          if (item.type === 'folder') {
+            folderCount++
+            if (item.items) countItems(item.items as typeof items)
+          } else if (item.type === 'request' && item.request) {
+            requests = [...requests, { name: item.name ?? '', method: item.request.method ?? 'GET', url: item.request.url ?? '' }]
+          }
+        }
+      }
+
+      if (source.type === 'curl') {
+        const draft = parseCurl(source.content)
+        collectionName = 'cURL Import'
+        requests = [{ name: draft.name, method: draft.method, url: draft.url }]
+      } else {
+        const json = JSON.parse(source.content)
+        const collection = source.type === 'postman'
+          ? importPostmanCollection(json)
+          : importOpenApiSpec(json)
+        collectionName = collection.name
+        countItems(collection.items)
+      }
+
+      return {
+        source,
+        collectionName,
+        requestCount: requests.length,
+        folderCount,
+        environmentCount: 0,
+        requests,
+      }
     },
 
-    async confirmImport(_preview: ImportPreview, _targetCollectionId?: CollectionId): Promise<CollectionId> {
-      // TODO: Implement
-      throw new Error('Import not yet implemented in workspace service.')
+    async confirmImport(preview: ImportPreview, targetCollectionId?: CollectionId): Promise<CollectionId> {
+      const { importPostmanCollection } = await import('../utils/import-postman')
+      const { importOpenApiSpec } = await import('../utils/import-openapi')
+      const { parseCurl } = await import('../utils/curl-parser')
+
+      requireWorkspace()
+
+      type ImportedItem = { type: string; name?: string; request?: any; items?: ImportedItem[] }
+
+      let importedItems: ImportedItem[] = []
+      let collectionName = preview.collectionName
+
+      if (preview.source.type === 'curl') {
+        const draft = parseCurl(preview.source.content)
+        importedItems = [{
+          type: 'request',
+          name: draft.name,
+          request: {
+            method: draft.method,
+            url: draft.url,
+            headers: draft.headers.map(h => ({ key: h.key, value: h.value, enabled: h.enabled })),
+            params: draft.params.map(p => ({ key: p.key, value: p.value, enabled: p.enabled })),
+            body: draft.body,
+            auth: draft.auth,
+            preRequest: '',
+            tests: '',
+          },
+        }]
+      } else {
+        const json = JSON.parse(preview.source.content)
+        const collection = preview.source.type === 'postman'
+          ? importPostmanCollection(json)
+          : importOpenApiSpec(json)
+        importedItems = collection.items
+        collectionName = collection.name
+      }
+
+      // Use existing collection or create new one
+      let colId: CollectionId
+      if (targetCollectionId) {
+        colId = targetCollectionId
+      } else {
+        const col = await this.createCollection(collectionName)
+        colId = col.id
+      }
+
+      // Recursively create requests and build tree
+      async function buildTree(items: ImportedItem[]): Promise<TreeNode[]> {
+        const nodes: TreeNode[] = []
+        for (const item of items) {
+          if (item.type === 'folder') {
+            const folderId = generateId<FolderId>()
+            const children = item.items ? await buildTree(item.items) : []
+            nodes.push({ type: 'folder', id: folderId, name: item.name ?? 'Folder', children })
+          } else if (item.type === 'request' && item.request) {
+            const requestId = generateId<RequestId>()
+            const timestamp = now()
+            const req: Request = {
+              id: requestId,
+              name: item.name ?? 'Untitled Request',
+              protocol: 'rest',
+              method: item.request.method ?? 'GET',
+              url: item.request.url ?? '',
+              headers: (item.request.headers ?? []).map((h: any) => ({ key: h.key, value: h.value, enabled: h.enabled ?? true })),
+              params: (item.request.params ?? []).map((p: any) => ({ key: p.key, value: p.value, enabled: p.enabled ?? true })),
+              pathParams: (item.request.pathParams ?? []).map((p: any) => ({ key: p.key, value: p.value, enabled: true })),
+              body: {
+                type: item.request.body?.type ?? 'none',
+                content: item.request.body?.content ?? '',
+                ...(item.request.body?.formData && {
+                  formData: item.request.body.formData.map((f: any) => ({ key: f.key, value: f.value, enabled: f.enabled ?? true })),
+                }),
+                ...(item.request.body?.binaryPath && { binaryPath: item.request.body.binaryPath }),
+              },
+              auth: item.request.auth ?? { type: 'none' },
+              preRequest: item.request.preRequest ?? '',
+              tests: item.request.tests ?? '',
+              meta: { createdAt: timestamp, updatedAt: timestamp },
+            }
+            await storage.writeJson(requestPath(requestId), requestToFile(req))
+            nodes.push({ type: 'request', requestId })
+          }
+        }
+        return nodes
+      }
+
+      const tree = await buildTree(importedItems)
+
+      // Update collection with built tree
+      const collection = await this.getCollection(colId)
+      const updatedItems = [...collection.items, ...tree]
+      await this.saveCollection({ ...collection, items: updatedItems })
+
+      return colId
     },
 
-    async exportCollection(_collectionId: CollectionId, _format: ExportFormat): Promise<string> {
-      // TODO: Implement per format
-      throw new Error('Export not yet implemented in workspace service.')
+    async exportCollection(collectionId: CollectionId, format: ExportFormat): Promise<string> {
+      const { exportToPostman } = await import('../utils/export-postman')
+      const { exportToCurl } = await import('../utils/export-curl')
+
+      const collection = await this.getCollection(collectionId)
+
+      if (format === 'curl') {
+        // Export first request found as curl
+        const firstRequestId = collectRequestIds(collection.items)[0]
+        if (!firstRequestId) throw new Error('Collection has no requests to export.')
+        const request = await this.getRequest(firstRequestId)
+        return exportToCurl(request)
+      }
+
+      // Postman format — build full export structure
+      type ExportItem = { id: string; type: 'request' | 'folder'; name: string; items?: ExportItem[]; request?: Request }
+
+      async function buildExportItems(nodes: readonly TreeNode[]): Promise<ExportItem[]> {
+        const items: ExportItem[] = []
+        for (const node of nodes) {
+          if (node.type === 'folder') {
+            items.push({
+              id: node.id,
+              type: 'folder',
+              name: node.name,
+              items: await buildExportItems(node.children),
+            })
+          } else {
+            try {
+              const file = await storage.readJson<import('../storage/models').RequestFile>(requestPath(node.requestId))
+              const req = requestFromFile(file)
+              items.push({ id: req.id, type: 'request', name: req.name, request: req })
+            } catch {
+              // Skip broken refs
+            }
+          }
+        }
+        return items
+      }
+
+      const exportItems = await buildExportItems(collection.items)
+      const exportData = exportToPostman({
+        id: collection.id,
+        name: collection.name,
+        items: exportItems,
+        variables: collection.variables.map(v => ({ key: v.key, value: v.value })),
+      })
+
+      return JSON.stringify(exportData, null, 2)
     },
   }
 }

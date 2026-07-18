@@ -8,6 +8,7 @@ import BaseButton from '@/components/base/BaseButton.vue'
 import BaseSelect from '@/components/base/BaseSelect.vue'
 import type { SelectOption } from '@/components/base/BaseSelect.vue'
 import BaseUrlInput from '@/components/base/BaseUrlInput.vue'
+import BaseTooltip from '@/components/base/BaseTooltip.vue'
 import { parseCurl } from '@/utils/curl-parser'
 
 const props = defineProps<{
@@ -171,8 +172,10 @@ const isNotReady = computed(() => currentProtocol.value !== 'rest')
     </span>
 
     <!-- Send button -->
-    <BaseButton :loading="isLoading" :disabled="isNotReady" @click="emit('send')">
-      {{ sendLabel }}
-    </BaseButton>
+    <BaseTooltip text="Send Request" shortcut="⌘↵" position="bottom">
+      <BaseButton :loading="isLoading" :disabled="isNotReady" @click="emit('send')">
+        {{ sendLabel }}
+      </BaseButton>
+    </BaseTooltip>
   </div>
 </template>

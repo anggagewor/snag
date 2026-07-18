@@ -118,6 +118,29 @@ export function createHistoryService(storage: StorageAdapter): HistoryService {
       return applyFilter(all, filter).length
     },
 
+    async removeById(id: string): Promise<boolean> {
+      const dir = historyDir()
+      await storage.ensureDir(dir)
+      const files = await storage.listFiles(dir, '*.json')
+
+      for (const filename of files) {
+        const file = await loadDayFile(filename)
+        const idx = file.entries.findIndex(e => e.id === id)
+        if (idx !== -1) {
+          const updatedEntries = [...file.entries]
+          updatedEntries.splice(idx, 1)
+          if (updatedEntries.length === 0) {
+            await storage.deleteFile(storage.globalPath(HISTORY_DIR, filename))
+          } else {
+            await saveDayFile(filename, { ...file, entries: updatedEntries })
+          }
+          return true
+        }
+      }
+
+      return false
+    },
+
     async clearBefore(date: string): Promise<number> {
       const cutoff = new Date(date)
       const cutoffFilename = dateToFilename(cutoff)
