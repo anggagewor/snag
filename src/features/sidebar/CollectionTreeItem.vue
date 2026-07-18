@@ -9,6 +9,7 @@ import type { TreeNode } from '@/domain'
 import type { CollectionId, FolderId, RequestId } from '@/domain'
 import BaseBadge from '@/components/base/BaseBadge.vue'
 import BaseDropdown from '@/components/base/BaseDropdown.vue'
+import BaseTooltip from '@/components/base/BaseTooltip.vue'
 import type { TreeContext } from './collectionTreeContext'
 
 const props = defineProps<{
@@ -173,6 +174,10 @@ function getRequestName(requestId: string): string {
 function getRequestMethod(requestId: string): string {
   return ctx.requestMethods.value.get(requestId) ?? 'GET'
 }
+
+function getRequestUrl(requestId: string): string {
+  return ctx.requestUrls.value.get(requestId) ?? ''
+}
 </script>
 
 <template>
@@ -297,7 +302,9 @@ function getRequestMethod(requestId: string): string {
       @blur="ctx.finishRenameItem(collectionId, item.requestId)"
       @click.stop
     />
-    <span v-else class="text-primary flex-1 truncate">{{ getRequestName(item.requestId) }}</span>
+    <BaseTooltip v-else :text="getRequestUrl(item.requestId) || getRequestName(item.requestId)" position="bottom" :delay="500" block>
+      <span class="text-primary flex-1 truncate">{{ getRequestName(item.requestId) }}</span>
+    </BaseTooltip>
 
     <!-- Request menu -->
     <div class="opacity-0 group-hover/item:opacity-100 transition-opacity" @click.stop>

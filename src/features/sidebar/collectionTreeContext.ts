@@ -14,6 +14,8 @@ export interface TreeContext {
   requestNames: Ref<Map<string, string>>
   /** Cached request methods for badge display (requestId → method) */
   requestMethods: Ref<Map<string, string>>
+  /** Cached request URLs for tooltip display (requestId → url) */
+  requestUrls: Ref<Map<string, string>>
   startRename: (id: string, name: string) => void
   finishRenameItem: (collectionId: string, itemId: string) => void
   cancelRename: () => void

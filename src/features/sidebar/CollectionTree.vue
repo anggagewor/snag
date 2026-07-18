@@ -21,6 +21,7 @@ const editingName = ref('')
 // Cache for request display data (loaded lazily)
 const requestNames = ref<Map<string, string>>(new Map())
 const requestMethods = ref<Map<string, string>>(new Map())
+const requestUrls = ref<Map<string, string>>(new Map())
 
 // Drag & drop state
 const draggingId = ref<string | null>(null)
@@ -36,9 +37,11 @@ async function loadRequestMeta(nodes: readonly TreeNode[]) {
           const req = await workspaceStore.getRequest(node.requestId as RequestId)
           requestNames.value.set(node.requestId, req.name)
           requestMethods.value.set(node.requestId, req.method)
+          requestUrls.value.set(node.requestId, req.url)
         } catch {
           requestNames.value.set(node.requestId, 'Unknown Request')
           requestMethods.value.set(node.requestId, 'GET')
+          requestUrls.value.set(node.requestId, '')
         }
       }
     } else if (node.type === 'folder') {
@@ -146,6 +149,7 @@ const treeContext: TreeContext = {
   editingName,
   requestNames,
   requestMethods,
+  requestUrls,
   startRename,
   finishRenameItem,
   cancelRename,

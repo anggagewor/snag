@@ -70,7 +70,7 @@ async function handleNewFolderInCollection() {
 <template>
   <div class="flex flex-col h-full">
     <!-- Workspace switcher row -->
-    <div class="flex items-center px-3 h-[33px] border-b border-border">
+    <div class="flex items-center px-3 h-[41px] border-b border-border">
       <WorkspaceSwitcher
         @switch="handleWorkspaceSwitch"
         @create="handleWorkspaceCreate"

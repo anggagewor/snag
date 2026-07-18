@@ -6,9 +6,11 @@ const props = withDefaults(defineProps<{
   shortcut?: string
   position?: 'top' | 'bottom' | 'left' | 'right'
   delay?: number
+  block?: boolean
 }>(), {
   position: 'top',
   delay: 400,
+  block: false,
 })
 
 const isVisible = ref(false)
@@ -23,14 +25,13 @@ const tooltipStyle = computed(() => {
     case 'bottom':
       return {
         top: `${rect.bottom + 6}px`,
-        left: `${rect.left + rect.width / 2}px`,
-        transform: 'translateX(-50%)',
+        left: `${rect.left}px`,
       }
     case 'top':
       return {
         top: `${rect.top - 6}px`,
-        left: `${rect.left + rect.width / 2}px`,
-        transform: 'translate(-50%, -100%)',
+        left: `${rect.left}px`,
+        transform: 'translateY(-100%)',
       }
     case 'left':
       return {
@@ -65,7 +66,7 @@ function hide() {
 <template>
   <div
     ref="trigger"
-    class="inline-flex"
+    :class="block ? 'flex flex-1 min-w-0' : 'inline-flex'"
     @mouseenter="show"
     @mouseleave="hide"
   >
@@ -81,10 +82,10 @@ function hide() {
     >
       <div
         v-if="isVisible"
-        class="fixed z-[9999] px-2 py-1.5 rounded shadow-lg pointer-events-none bg-gray-900 dark:bg-gray-700 border border-gray-700 dark:border-gray-600"
+        class="fixed z-[9999] px-2 py-1.5 rounded shadow-lg pointer-events-none bg-gray-900 dark:bg-gray-700 border border-gray-700 dark:border-gray-600 max-w-[360px]"
         :style="tooltipStyle"
       >
-        <span class="text-[11px] text-white whitespace-nowrap">{{ text }}</span>
+        <span class="text-[11px] text-white break-all">{{ text }}</span>
         <kbd
           v-if="shortcut"
           class="ml-2 inline-flex items-center px-1.5 py-0.5 text-[10px] font-mono text-gray-300 bg-gray-800 dark:bg-gray-600 rounded"

@@ -1,43 +1,36 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 
-import { X, Clock, Search } from 'lucide-vue-next'
+import { X, Clock } from 'lucide-vue-next'
 
 import { useHistoryStore } from '@/stores/history'
 import { useTabsStore } from '@/stores/tabs'
 import type { HistoryEntry, HttpMethod } from '@/domain'
 import BaseBadge from '@/components/base/BaseBadge.vue'
 import BaseButton from '@/components/base/BaseButton.vue'
-import BaseSelect from '@/components/base/BaseSelect.vue'
-import type { SelectOption } from '@/components/base/BaseSelect.vue'
+import BaseTooltip from '@/components/base/BaseTooltip.vue'
 
 const historyStore = useHistoryStore()
 const tabsStore = useTabsStore()
 
 // ─── Filter State ────────────────────────────────────────────────
 
-const filterMethod = ref<string>('')
-const filterUrl = ref<string>('')
-
-const methodOptions: SelectOption[] = [
-  { label: 'All', value: '' },
-  { label: 'GET', value: 'GET' },
-  { label: 'POST', value: 'POST' },
-  { label: 'PUT', value: 'PUT' },
-  { label: 'PATCH', value: 'PATCH' },
-  { label: 'DELETE', value: 'DELETE' },
-  { label: 'HEAD', value: 'HEAD' },
-  { label: 'OPTIONS', value: 'OPTIONS' },
-]
+const filterText = ref('')
 
 let debounceTimer: ReturnType<typeof setTimeout> | null = null
 
-watch([filterMethod, filterUrl], () => {
+watch(filterText, () => {
   if (debounceTimer) clearTimeout(debounceTimer)
   debounceTimer = setTimeout(() => {
+    const text = filterText.value.trim()
+    // Detect if the filter is a method name
+    const methods: HttpMethod[] = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS']
+    const upper = text.toUpperCase()
+    const matchedMethod = methods.find(m => m === upper)
+
     historyStore.query({
-      method: (filterMethod.value || undefined) as HttpMethod | undefined,
-      urlContains: filterUrl.value || undefined,
+      method: matchedMethod ?? undefined,
+      urlContains: matchedMethod ? undefined : (text || undefined),
     })
   }, 300)
 })
@@ -159,7 +152,7 @@ function getEntryTitle(entry: HistoryEntry): string {
     const parsed = new URL(entry.url)
     return `${entry.method} ${parsed.pathname}`
   } catch {
-    return `${entry.method} ${entry.url.slice(0, 40)}`
+    return `${entry.method} ${entry.url.slice(0, 10)}`
   }
 }
 
@@ -178,6 +171,11 @@ function formatSize(bytes: number): string {
   if (bytes < 1024) return `${bytes}B`
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)}KB`
   return `${(bytes / (1024 * 1024)).toFixed(1)}MB`
+}
+
+function shortenUrl(url: string): string {
+  if (url.length <= 10) return url
+  return url.slice(0, 10) + '…'
 }
 
 function getStatusVariant(status: number): 'success' | 'warning' | 'error' | 'neutral' {
@@ -204,25 +202,13 @@ function getStatusVariant(status: number): 'success' | 'warning' | 'error' | 'ne
     </div>
 
     <!-- Filter Bar -->
-    <div class="px-3 py-2 border-b border-border flex-shrink-0 space-y-1.5">
-      <div class="flex gap-1.5">
-        <BaseSelect
-          v-model="filterMethod"
-          :options="methodOptions"
-          size="sm"
-          placeholder="All"
-          class="w-24 flex-shrink-0"
-        />
-        <div class="relative flex-1">
-          <Search class="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-muted" />
-          <input
-            v-model="filterUrl"
-            type="text"
-            placeholder="Filter URL..."
-            class="w-full rounded-md border border-border bg-surface text-primary placeholder:text-muted text-xs pl-6 pr-2 py-1 focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent/50"
-          />
-        </div>
-      </div>
+    <div class="px-3 py-2 border-b border-border flex-shrink-0">
+      <input
+        v-model="filterText"
+        type="text"
+        placeholder="Filter history..."
+        class="w-full rounded-md border border-border bg-surface text-primary placeholder:text-muted text-xs px-2.5 py-1.5 focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent/50"
+      />
     </div>
 
     <!-- Empty state -->
@@ -241,37 +227,44 @@ function getStatusVariant(status: number): 'success' | 'warning' | 'error' | 'ne
           {{ group.label }}
         </div>
         <div class="space-y-0.5 px-1.5">
-          <div
+          <BaseTooltip
             v-for="entry in group.entries"
             :key="entry.id"
-            class="flex items-center gap-2 px-2 py-1.5 rounded text-xs hover:bg-surface-hover cursor-pointer group"
-            @click="openEntry(entry)"
+            :text="entry.url || 'No URL'"
+            position="bottom"
+            :delay="400"
+            block
           >
-            <BaseBadge :method="entry.method" />
-            <span class="flex-1 truncate text-primary font-mono text-[11px]">
-              {{ entry.url || 'No URL' }}
-            </span>
-            <span v-if="entry.duration > 0" class="text-[10px] text-muted flex-shrink-0">
-              {{ formatDuration(entry.duration) }}
-            </span>
-            <span v-if="entry.responseSize > 0" class="text-[10px] text-muted flex-shrink-0">
-              {{ formatSize(entry.responseSize) }}
-            </span>
-            <BaseBadge
-              v-if="entry.status > 0"
-              :variant="getStatusVariant(entry.status)"
+            <div
+              class="flex items-center gap-2 px-2 py-1.5 rounded text-xs hover:bg-surface-hover cursor-pointer group"
+              @click="openEntry(entry)"
             >
-              {{ entry.status }}
-            </BaseBadge>
-            <span class="text-[10px] text-muted flex-shrink-0">{{ formatTime(entry.timestamp) }}</span>
-            <!-- Delete button -->
-            <button
-              class="text-muted hover:text-error opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"
-              @click.stop="historyStore.removeEntry(entry.id)"
-            >
-              <X class="w-3 h-3" />
-            </button>
-          </div>
+              <BaseBadge :method="entry.method" />
+              <span class="flex-1 truncate text-primary font-mono text-[11px]">
+                {{ shortenUrl(entry.url) || 'No URL' }}
+              </span>
+              <span v-if="entry.duration > 0" class="text-[10px] text-muted flex-shrink-0">
+                {{ formatDuration(entry.duration) }}
+              </span>
+              <span v-if="entry.responseSize > 0" class="text-[10px] text-muted flex-shrink-0">
+                {{ formatSize(entry.responseSize) }}
+              </span>
+              <BaseBadge
+                v-if="entry.status > 0"
+                :variant="getStatusVariant(entry.status)"
+              >
+                {{ entry.status }}
+              </BaseBadge>
+              <span class="text-[10px] text-muted flex-shrink-0">{{ formatTime(entry.timestamp) }}</span>
+              <!-- Delete button -->
+              <button
+                class="text-muted hover:text-error opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"
+                @click.stop="historyStore.removeEntry(entry.id)"
+              >
+                <X class="w-3 h-3" />
+              </button>
+            </div>
+          </BaseTooltip>
         </div>
       </div>
     </div>
