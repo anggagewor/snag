@@ -11,40 +11,326 @@
     "http:default",
     {
       "identifier": "http:allow-fetch",
-      "allow": [{ "url": "http://**" }, { "url": "https://**" }]
+      "allow": [
+        {
+          "url": "http://**"
+        },
+        {
+          "url": "https://**"
+        }
+      ]
     },
     {
       "identifier": "http:allow-fetch-send",
-      "allow": [{ "url": "http://**" }, { "url": "https://**" }]
+      "allow": [
+        {
+          "url": "http://**"
+        },
+        {
+          "url": "https://**"
+        }
+      ]
     },
-    "fs:default",
+    "fs:read-all",
+    "fs:write-all",
+    "fs:create-app-specific-dirs",
     {
-      "identifier": "fs:allow-read-text-file",
-      "allow": [{ "path": "$APPDATA/**" }, { "path": "**" }]
-    },
-    {
-      "identifier": "fs:allow-write-text-file",
-      "allow": [{ "path": "$APPDATA/**" }, { "path": "**" }]
+      "identifier": "fs:scope",
+      "allow": [
+        {
+          "path": "$APPDATA"
+        },
+        {
+          "path": "$APPDATA/**"
+        },
+        {
+          "path": "$APPLOCALDATA"
+        },
+        {
+          "path": "$APPLOCALDATA/**"
+        },
+        {
+          "path": "$APPCONFIG"
+        },
+        {
+          "path": "$APPCONFIG/**"
+        },
+        {
+          "path": "$APPCACHE"
+        },
+        {
+          "path": "$APPCACHE/**"
+        },
+        {
+          "path": "$APPLOG"
+        },
+        {
+          "path": "$APPLOG/**"
+        },
+        {
+          "path": "$HOME"
+        },
+        {
+          "path": "$HOME/**"
+        },
+        {
+          "path": "$DOCUMENT"
+        },
+        {
+          "path": "$DOCUMENT/**"
+        },
+        {
+          "path": "$DOWNLOAD"
+        },
+        {
+          "path": "$DOWNLOAD/**"
+        },
+        {
+          "path": "$DESKTOP"
+        },
+        {
+          "path": "$DESKTOP/**"
+        },
+        {
+          "path": "$RESOURCE/**"
+        }
+      ]
     },
     {
       "identifier": "fs:allow-exists",
-      "allow": [{ "path": "$APPDATA/**" }, { "path": "**" }]
+      "allow": [
+        {
+          "path": "$APPDATA"
+        },
+        {
+          "path": "$APPDATA/**"
+        },
+        {
+          "path": "$APPLOCALDATA"
+        },
+        {
+          "path": "$APPLOCALDATA/**"
+        },
+        {
+          "path": "$APPCONFIG"
+        },
+        {
+          "path": "$APPCONFIG/**"
+        },
+        {
+          "path": "$APPCACHE"
+        },
+        {
+          "path": "$APPCACHE/**"
+        },
+        {
+          "path": "$APPLOG"
+        },
+        {
+          "path": "$APPLOG/**"
+        },
+        {
+          "path": "$HOME"
+        },
+        {
+          "path": "$HOME/**"
+        },
+        {
+          "path": "$DOCUMENT"
+        },
+        {
+          "path": "$DOCUMENT/**"
+        },
+        {
+          "path": "$DOWNLOAD"
+        },
+        {
+          "path": "$DOWNLOAD/**"
+        },
+        {
+          "path": "$DESKTOP"
+        },
+        {
+          "path": "$DESKTOP/**"
+        }
+      ]
     },
     {
       "identifier": "fs:allow-mkdir",
-      "allow": [{ "path": "$APPDATA/**" }, { "path": "**" }]
-    },
-    {
-      "identifier": "fs:allow-remove",
-      "allow": [{ "path": "$APPDATA/**" }, { "path": "**" }]
+      "allow": [
+        {
+          "path": "$APPDATA"
+        },
+        {
+          "path": "$APPDATA/**"
+        },
+        {
+          "path": "$APPLOCALDATA"
+        },
+        {
+          "path": "$APPLOCALDATA/**"
+        },
+        {
+          "path": "$APPCONFIG"
+        },
+        {
+          "path": "$APPCONFIG/**"
+        },
+        {
+          "path": "$APPCACHE"
+        },
+        {
+          "path": "$APPCACHE/**"
+        },
+        {
+          "path": "$APPLOG"
+        },
+        {
+          "path": "$APPLOG/**"
+        },
+        {
+          "path": "$HOME"
+        },
+        {
+          "path": "$HOME/**"
+        },
+        {
+          "path": "$DOCUMENT"
+        },
+        {
+          "path": "$DOCUMENT/**"
+        },
+        {
+          "path": "$DOWNLOAD"
+        },
+        {
+          "path": "$DOWNLOAD/**"
+        },
+        {
+          "path": "$DESKTOP"
+        },
+        {
+          "path": "$DESKTOP/**"
+        }
+      ]
     },
     {
       "identifier": "fs:allow-read-dir",
-      "allow": [{ "path": "$APPDATA/**" }, { "path": "**" }]
+      "allow": [
+        {
+          "path": "$APPDATA"
+        },
+        {
+          "path": "$APPDATA/**"
+        },
+        {
+          "path": "$APPLOCALDATA"
+        },
+        {
+          "path": "$APPLOCALDATA/**"
+        },
+        {
+          "path": "$APPCONFIG"
+        },
+        {
+          "path": "$APPCONFIG/**"
+        },
+        {
+          "path": "$APPCACHE"
+        },
+        {
+          "path": "$APPCACHE/**"
+        },
+        {
+          "path": "$APPLOG"
+        },
+        {
+          "path": "$APPLOG/**"
+        },
+        {
+          "path": "$HOME"
+        },
+        {
+          "path": "$HOME/**"
+        },
+        {
+          "path": "$DOCUMENT"
+        },
+        {
+          "path": "$DOCUMENT/**"
+        },
+        {
+          "path": "$DOWNLOAD"
+        },
+        {
+          "path": "$DOWNLOAD/**"
+        },
+        {
+          "path": "$DESKTOP"
+        },
+        {
+          "path": "$DESKTOP/**"
+        }
+      ]
     },
     {
-      "identifier": "fs:allow-read-file",
-      "allow": [{ "path": "**" }]
+      "identifier": "fs:allow-remove",
+      "allow": [
+        {
+          "path": "$APPDATA"
+        },
+        {
+          "path": "$APPDATA/**"
+        },
+        {
+          "path": "$APPLOCALDATA"
+        },
+        {
+          "path": "$APPLOCALDATA/**"
+        },
+        {
+          "path": "$APPCONFIG"
+        },
+        {
+          "path": "$APPCONFIG/**"
+        },
+        {
+          "path": "$APPCACHE"
+        },
+        {
+          "path": "$APPCACHE/**"
+        },
+        {
+          "path": "$APPLOG"
+        },
+        {
+          "path": "$APPLOG/**"
+        },
+        {
+          "path": "$HOME"
+        },
+        {
+          "path": "$HOME/**"
+        },
+        {
+          "path": "$DOCUMENT"
+        },
+        {
+          "path": "$DOCUMENT/**"
+        },
+        {
+          "path": "$DOWNLOAD"
+        },
+        {
+          "path": "$DOWNLOAD/**"
+        },
+        {
+          "path": "$DESKTOP"
+        },
+        {
+          "path": "$DESKTOP/**"
+        }
+      ]
     },
     "dialog:default"
   ]

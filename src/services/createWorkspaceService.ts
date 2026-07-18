@@ -174,15 +174,31 @@ export function createWorkspaceService(storage: StorageAdapter): WorkspaceServic
     async openWorkspace(path: string): Promise<Workspace> {
       setWorkspaceRoot(path)
 
-      const manifestPath = storage.workspacePath(WORKSPACE_MANIFEST)
-      const file = await storage.readJson<WorkspaceFile>(manifestPath)
-      const workspace = workspaceFromFile(file)
+      try {
+        const manifestPath = storage.workspacePath(WORKSPACE_MANIFEST)
+        const manifestExists = await storage.exists(manifestPath)
 
-      // Update lastOpenedAt
-      activeWorkspace = { ...workspace, lastOpenedAt: now() }
-      await storage.writeJson(manifestPath, workspaceToFile(activeWorkspace))
+        if (!manifestExists) {
+          // Auto-initialize empty folder as workspace
+          const folderName = path.split('/').filter(Boolean).pop() ?? 'Workspace'
+          const created = await this.createWorkspace(folderName, path)
+          return created
+        }
 
-      return activeWorkspace
+        const file = await storage.readJson<WorkspaceFile>(manifestPath)
+        const workspace = workspaceFromFile(file)
+
+        // Update lastOpenedAt
+        activeWorkspace = { ...workspace, lastOpenedAt: now() }
+        await storage.writeJson(manifestPath, workspaceToFile(activeWorkspace))
+
+        return activeWorkspace
+      } catch (err) {
+        // Reset workspace root on failure to prevent stale path usage
+        setWorkspaceRoot(null)
+        activeWorkspace = null
+        throw err
+      }
     },
 
     async closeWorkspace(): Promise<void> {
@@ -523,6 +539,7 @@ export function createWorkspaceService(storage: StorageAdapter): WorkspaceServic
     },
 
     async createEnvironment(name: string): Promise<Environment> {
+      requireWorkspace()
       const id = generateId<EnvironmentId>()
       const env: Environment = { id, name, variables: [] }
       await storage.writeJson(environmentPath(id), environmentToFile(env))
