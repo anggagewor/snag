@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 
-import { Play, Square, AlertTriangle, CheckCircle2, XCircle } from 'lucide-vue-next'
+import { Play, Square, AlertTriangle, CheckCircle2, XCircle, Search, Database } from 'lucide-vue-next'
 
 import { useGraphQL } from '@/composables/useGraphQL'
+import type { IntrospectionType } from '@/composables/useGraphQL'
 import { useTabsStore } from '@/stores/tabs'
 import { useHistoryStore } from '@/stores/history'
 import type { Tab } from '@/stores/tabs'
@@ -24,9 +25,9 @@ const props = defineProps<{
 
 const tabsStore = useTabsStore()
 const historyStore = useHistoryStore()
-const { isLoading, error, executeQuery, cancelQuery } = useGraphQL()
+const { isLoading, error, executeQuery, cancelQuery, isIntrospecting, schema, introspectionError, introspect } = useGraphQL()
 
-const activeSection = ref<'query' | 'variables' | 'headers' | 'auth'>('query')
+const activeSection = ref<'query' | 'variables' | 'headers' | 'auth' | 'schema'>('query')
 const responseSection = ref<'body' | 'headers'>('body')
 
 const protocolOptions = PROTOCOL_OPTIONS
@@ -147,6 +148,46 @@ function handleKeyDown(e: KeyboardEvent) {
     handleQuery()
   }
 }
+
+// ─── Schema Introspection ─────────────────────────────────────────
+
+const schemaFilter = ref('')
+const expandedType = ref<string | null>(null)
+
+const filteredTypes = computed(() => {
+  if (!schema.value) return []
+  const q = schemaFilter.value.toLowerCase()
+  if (!q) return schema.value.types
+  return schema.value.types.filter(
+    t => t.name.toLowerCase().includes(q)
+      || t.fields.some(f => f.name.toLowerCase().includes(q))
+  )
+})
+
+function toggleType(name: string) {
+  expandedType.value = expandedType.value === name ? null : name
+}
+
+async function handleIntrospect() {
+  const url = props.tab.requestDraft?.url
+  if (!url) return
+
+  const auth: RequestAuthDraft = props.tab.requestDraft?.auth ?? { type: 'none' }
+  const configHeaders = headers.value
+    .filter(h => h.enabled && h.key)
+    .map(h => ({ key: h.key, value: h.value, enabled: h.enabled }))
+
+  await introspect(url, auth, configHeaders, props.tab.collectionVariables)
+  activeSection.value = 'schema'
+}
+
+function insertTypeQuery(type: IntrospectionType) {
+  if (!type.fields.length) return
+  const fields = type.fields.slice(0, 5).map(f => `    ${f.name}`).join('\n')
+  const snippet = `query {\n  # ${type.name}\n${fields}\n}`
+  query.value = snippet
+  activeSection.value = 'query'
+}
 </script>
 
 <template>
@@ -195,7 +236,7 @@ function handleKeyDown(e: KeyboardEvent) {
           <!-- Section tabs -->
           <div class="flex border-b border-border px-3">
             <button
-              v-for="section in (['query', 'variables', 'headers', 'auth'] as const)"
+              v-for="section in (['query', 'variables', 'headers', 'auth', 'schema'] as const)"
               :key="section"
               class="px-3 py-2 text-xs font-medium capitalize border-b-2 transition-colors"
               :class="activeSection === section
@@ -204,6 +245,17 @@ function handleKeyDown(e: KeyboardEvent) {
               @click="activeSection = section"
             >
               {{ section }}
+              <span v-if="section === 'schema' && schema" class="ml-1 text-[10px] text-success">●</span>
+            </button>
+
+            <!-- Introspect button -->
+            <button
+              class="ml-auto px-2 py-1 text-[10px] text-secondary hover:text-accent transition-colors flex items-center gap-1"
+              :disabled="!tab.requestDraft?.url || isIntrospecting"
+              @click="handleIntrospect"
+            >
+              <Database class="w-3 h-3" :class="{ 'animate-pulse': isIntrospecting }" />
+              {{ isIntrospecting ? 'Loading...' : 'Introspect' }}
             </button>
           </div>
 
@@ -250,6 +302,113 @@ function handleKeyDown(e: KeyboardEvent) {
             <!-- Auth -->
             <div v-else-if="activeSection === 'auth'" class="h-full overflow-auto p-3">
               <RequestAuth :tab="tab" />
+            </div>
+
+            <!-- Schema explorer -->
+            <div v-else-if="activeSection === 'schema'" class="h-full overflow-auto p-3">
+              <!-- Introspection error -->
+              <div v-if="introspectionError" class="flex items-center gap-2 p-2 mb-3 rounded bg-error/5 border border-error/20">
+                <AlertTriangle class="w-3.5 h-3.5 text-error flex-shrink-0" />
+                <span class="text-xs text-error">{{ introspectionError }}</span>
+              </div>
+
+              <!-- No schema yet -->
+              <div v-else-if="!schema" class="h-full flex flex-col items-center justify-center text-muted">
+                <Database class="w-8 h-8 text-secondary/30 mb-2" />
+                <p class="text-sm">No schema loaded</p>
+                <p class="text-xs mt-1">Click "Introspect" to fetch the schema from the endpoint</p>
+              </div>
+
+              <!-- Schema loaded -->
+              <template v-else>
+                <!-- Schema summary -->
+                <div class="flex items-center gap-3 mb-3 text-[10px] text-secondary">
+                  <span v-if="schema.queryType" class="px-1.5 py-0.5 rounded bg-success/10 text-success">
+                    Query: {{ schema.queryType }}
+                  </span>
+                  <span v-if="schema.mutationType" class="px-1.5 py-0.5 rounded bg-warning/10 text-warning">
+                    Mutation: {{ schema.mutationType }}
+                  </span>
+                  <span v-if="schema.subscriptionType" class="px-1.5 py-0.5 rounded bg-accent/10 text-accent">
+                    Subscription: {{ schema.subscriptionType }}
+                  </span>
+                  <span class="text-secondary">{{ schema.types.length }} types</span>
+                </div>
+
+                <!-- Search/filter -->
+                <div class="relative mb-3">
+                  <Search class="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-secondary" />
+                  <input
+                    v-model="schemaFilter"
+                    type="text"
+                    placeholder="Filter types..."
+                    class="w-full text-xs bg-surface-alt border border-border rounded pl-7 pr-2 py-1.5 text-primary placeholder:text-secondary/50 focus:outline-none focus:border-accent"
+                  />
+                </div>
+
+                <!-- Type list -->
+                <div class="space-y-1">
+                  <div
+                    v-for="type in filteredTypes"
+                    :key="type.name"
+                    class="border border-border rounded overflow-hidden"
+                  >
+                    <!-- Type header -->
+                    <button
+                      class="w-full flex items-center gap-2 px-3 py-1.5 text-left hover:bg-surface-alt transition-colors"
+                      @click="toggleType(type.name)"
+                    >
+                      <span
+                        class="text-[10px] px-1 py-0.5 rounded font-mono"
+                        :class="{
+                          'bg-blue-500/10 text-blue-500': type.kind === 'OBJECT',
+                          'bg-purple-500/10 text-purple-500': type.kind === 'INPUT_OBJECT',
+                          'bg-amber-500/10 text-amber-500': type.kind === 'ENUM',
+                          'bg-pink-500/10 text-pink-500': type.kind === 'INTERFACE',
+                          'bg-teal-500/10 text-teal-500': type.kind === 'UNION',
+                          'bg-gray-500/10 text-gray-500': type.kind === 'SCALAR',
+                        }"
+                      >
+                        {{ type.kind }}
+                      </span>
+                      <span class="text-xs font-medium text-primary">{{ type.name }}</span>
+                      <span v-if="type.fields.length" class="text-[10px] text-secondary ml-auto">
+                        {{ type.fields.length }} fields
+                      </span>
+                      <svg
+                        class="w-3 h-3 text-secondary transition-transform"
+                        :class="{ 'rotate-90': expandedType === type.name }"
+                        fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                      >
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                      </svg>
+                    </button>
+
+                    <!-- Type fields (expanded) -->
+                    <div v-if="expandedType === type.name && type.fields.length" class="border-t border-border bg-surface-alt">
+                      <div
+                        v-for="field in type.fields"
+                        :key="field.name"
+                        class="px-3 py-1 border-b border-border last:border-b-0 flex items-center gap-2"
+                      >
+                        <span class="text-xs font-mono text-primary">{{ field.name }}</span>
+                        <span v-if="field.args.length" class="text-[10px] text-secondary">
+                          ({{ field.args.map(a => `${a.name}: ${a.type}`).join(', ') }})
+                        </span>
+                        <span class="text-[10px] text-accent ml-auto font-mono">{{ field.type }}</span>
+                      </div>
+
+                      <!-- Use type button -->
+                      <button
+                        class="w-full px-3 py-1.5 text-[10px] text-accent hover:bg-accent/5 transition-colors text-left"
+                        @click="insertTypeQuery(type)"
+                      >
+                        → Insert query snippet
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </template>
             </div>
           </div>
         </div>

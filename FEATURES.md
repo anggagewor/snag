@@ -113,10 +113,29 @@
 - JSON files via Tauri FS plugin
 - Browser localStorage fallback (dev mode)
 
+### WebSocket
+- Connect/disconnect to WebSocket servers
+- Real-time message list (sent/received with timestamps + size)
+- Message composer with JSON/text format modes (CodeMirror)
+- Connection status indicator (connected/connecting/disconnected/error)
+- Custom headers for connection
+- Auto-formatted JSON messages
+- Auto-scroll on new messages
+
+### GraphQL
+- Query editor (CodeMirror) with operation name support
+- Variables editor (JSON)
+- Custom headers + auth (Bearer, Basic, API Key)
+- Response viewer with data/errors parsing
+- GraphQL error highlighting (line/column)
+- Schema introspection (fetch + explore types/queries/mutations)
+- Records to history
+
 ### Multi-Protocol Foundation
 - Type definitions for REST, WebSocket, GraphQL, gRPC
-- Protocol selector functional in UI
+- Protocol selector functional in UI (switch between protocols per tab)
 - Backward-compatible (default REST)
+- gRPC: types ready, UI coming soon
 
 ---
 
@@ -136,8 +155,8 @@
 
 | Protocol | Status | Description |
 |----------|--------|-------------|
-| WebSocket | Types ready | Connect, send messages, view frames real-time |
-| GraphQL | Types ready | Schema introspection, query editor, variables panel |
+| WebSocket | ✅ Implemented | Connect, send messages, view frames real-time |
+| GraphQL | ✅ Implemented | Query editor, variables panel, schema introspection |
 | gRPC | Types ready | Load .proto files, invoke unary + streaming RPCs |
 | SSE | Backlog | EventSource stream viewer |
 

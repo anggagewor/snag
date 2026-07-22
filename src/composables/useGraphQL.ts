@@ -24,6 +24,113 @@ async function doFetch(url: string, init: RequestInit & { dangerAcceptInvalidCer
   return globalThis.fetch(url, init)
 }
 
+// ─── Introspection Types ──────────────────────────────────────────
+
+export interface IntrospectionField {
+  readonly name: string
+  readonly description: string | null
+  readonly type: string
+  readonly args: readonly { name: string; type: string }[]
+}
+
+export interface IntrospectionType {
+  readonly name: string
+  readonly kind: string
+  readonly description: string | null
+  readonly fields: readonly IntrospectionField[]
+}
+
+export interface IntrospectionSchema {
+  readonly queryType: string | null
+  readonly mutationType: string | null
+  readonly subscriptionType: string | null
+  readonly types: readonly IntrospectionType[]
+}
+
+const INTROSPECTION_QUERY = `
+  query IntrospectionQuery {
+    __schema {
+      queryType { name }
+      mutationType { name }
+      subscriptionType { name }
+      types {
+        name
+        kind
+        description
+        fields(includeDeprecated: true) {
+          name
+          description
+          type {
+            name
+            kind
+            ofType { name kind ofType { name kind ofType { name kind } } }
+          }
+          args {
+            name
+            type {
+              name
+              kind
+              ofType { name kind ofType { name kind ofType { name kind } } }
+            }
+          }
+        }
+      }
+    }
+  }
+`
+
+function resolveTypeName(typeObj: Record<string, unknown>): string {
+  if (!typeObj) return 'Unknown'
+  const kind = typeObj.kind as string
+  const name = typeObj.name as string | null
+  const ofType = typeObj.ofType as Record<string, unknown> | null
+
+  if (kind === 'NON_NULL') return `${resolveTypeName(ofType!)}!`
+  if (kind === 'LIST') return `[${resolveTypeName(ofType!)}]`
+  return name ?? 'Unknown'
+}
+
+function parseIntrospectionResult(raw: Record<string, unknown>): IntrospectionSchema {
+  const rawTypes = (raw.types ?? []) as Record<string, unknown>[]
+  const queryType = raw.queryType as { name: string } | null
+  const mutationType = raw.mutationType as { name: string } | null
+  const subscriptionType = raw.subscriptionType as { name: string } | null
+
+  const types: IntrospectionType[] = rawTypes
+    .filter((t) => {
+      const name = t.name as string
+      return !name.startsWith('__')
+    })
+    .map((t) => {
+      const rawFields = (t.fields ?? []) as Record<string, unknown>[]
+      const fields: IntrospectionField[] = rawFields.map((f) => ({
+        name: f.name as string,
+        description: (f.description as string | null) ?? null,
+        type: resolveTypeName(f.type as Record<string, unknown>),
+        args: ((f.args ?? []) as Record<string, unknown>[]).map((a) => ({
+          name: a.name as string,
+          type: resolveTypeName(a.type as Record<string, unknown>),
+        })),
+      }))
+
+      return {
+        name: t.name as string,
+        kind: t.kind as string,
+        description: (t.description as string | null) ?? null,
+        fields,
+      }
+    })
+
+  return {
+    queryType: queryType?.name ?? null,
+    mutationType: mutationType?.name ?? null,
+    subscriptionType: subscriptionType?.name ?? null,
+    types,
+  }
+}
+
+// ─── Composable ───────────────────────────────────────────────────
+
 export function useGraphQL() {
   const isLoading = ref(false)
   const error = ref<string | null>(null)
@@ -183,10 +290,83 @@ export function useGraphQL() {
     }
   }
 
+  // ─── Schema Introspection ───────────────────────────────────────
+
+  const isIntrospecting = ref(false)
+  const schema = ref<IntrospectionSchema | null>(null)
+  const introspectionError = ref<string | null>(null)
+
+  async function introspect(
+    url: string,
+    auth: RequestAuthDraft,
+    configHeaders: { key: string; value: string; enabled: boolean }[],
+    collectionVariables?: { key: string; value: string }[],
+  ): Promise<IntrospectionSchema | null> {
+    isIntrospecting.value = true
+    introspectionError.value = null
+
+    const settingsStore = useSettingsStore()
+    const resolvedUrl = resolve(url, collectionVariables)
+
+    try {
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      }
+
+      for (const h of configHeaders) {
+        if (h.enabled && h.key) {
+          headers[resolve(h.key, collectionVariables)] = resolve(h.value, collectionVariables)
+        }
+      }
+
+      const authHeaders = buildAuthHeaders(auth, collectionVariables)
+      Object.assign(headers, authHeaders)
+
+      let finalUrl = resolvedUrl
+      if (auth.type === 'apikey' && auth.apiKey?.in === 'query') {
+        const separator = finalUrl.includes('?') ? '&' : '?'
+        finalUrl += `${separator}${encodeURIComponent(resolve(auth.apiKey.key, collectionVariables))}=${encodeURIComponent(resolve(auth.apiKey.value, collectionVariables))}`
+      }
+
+      const response = await doFetch(finalUrl, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ query: INTROSPECTION_QUERY }),
+        dangerAcceptInvalidCerts: !(settingsStore.settings.validateSsl ?? true),
+      })
+
+      const text = await response.text()
+      const parsed = JSON.parse(text)
+
+      if (parsed.errors) {
+        introspectionError.value = parsed.errors.map((e: { message: string }) => e.message).join(', ')
+        return null
+      }
+
+      const rawSchema = parsed.data?.__schema
+      if (!rawSchema) {
+        introspectionError.value = 'No schema data in response'
+        return null
+      }
+
+      schema.value = parseIntrospectionResult(rawSchema)
+      return schema.value
+    } catch (err) {
+      introspectionError.value = err instanceof Error ? err.message : String(err)
+      return null
+    } finally {
+      isIntrospecting.value = false
+    }
+  }
+
   return {
     isLoading,
     error,
     executeQuery,
     cancelQuery,
+    isIntrospecting,
+    schema,
+    introspectionError,
+    introspect,
   }
 }
