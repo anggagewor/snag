@@ -5,6 +5,8 @@ import { Loader2, AlertCircle } from 'lucide-vue-next'
 
 import { useTabsStore } from '@/stores/tabs'
 import RequestPanel from '@/features/request/RequestPanel.vue'
+import WebSocketPanel from '@/features/websocket/WebSocketPanel.vue'
+import GraphQLPanel from '@/features/graphql/GraphQLPanel.vue'
 import SettingsPanel from '@/features/settings/SettingsPanel.vue'
 import EnvironmentPanel from '@/features/environments/EnvironmentPanel.vue'
 import CookiePanel from '@/features/cookies/CookiePanel.vue'
@@ -54,7 +56,9 @@ watch(
       <p class="text-xs">Loading request...</p>
     </div>
 
-    <!-- Active tab content -->
+    <!-- Active tab content — protocol-aware routing -->
+    <WebSocketPanel v-else-if="tabsStore.activeTab.type === 'request' && tabsStore.activeTab.protocol === 'websocket'" :tab="tabsStore.activeTab" />
+    <GraphQLPanel v-else-if="tabsStore.activeTab.type === 'request' && tabsStore.activeTab.protocol === 'graphql'" :tab="tabsStore.activeTab" />
     <RequestPanel v-else-if="tabsStore.activeTab.type === 'request'" :tab="tabsStore.activeTab" />
     <SettingsPanel v-else-if="tabsStore.activeTab.type === 'settings'" />
     <EnvironmentPanel v-else-if="tabsStore.activeTab.type === 'environments'" />

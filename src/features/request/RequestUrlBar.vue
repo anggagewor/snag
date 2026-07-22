@@ -4,6 +4,7 @@ import { computed } from 'vue'
 import { useWorkspaceStore } from '@/stores/workspace'
 import { useTabsStore } from '@/stores/tabs'
 import type { HttpMethod, ProtocolType, RequestDraft } from '@/domain'
+import { PROTOCOL_OPTIONS } from '@/domain/protocols-ui'
 import BaseButton from '@/components/base/BaseButton.vue'
 import BaseSelect from '@/components/base/BaseSelect.vue'
 import type { SelectOption } from '@/components/base/BaseSelect.vue'
@@ -28,12 +29,7 @@ const tabsStore = useTabsStore()
 
 const workspaceStore = useWorkspaceStore()
 
-const protocolOptions: SelectOption[] = [
-  { label: 'REST', value: 'rest', color: '#10b981' },
-  { label: 'WS', value: 'websocket', color: '#f59e0b' },
-  { label: 'GQL', value: 'graphql', color: '#e535ab' },
-  { label: 'gRPC', value: 'grpc', color: '#3b82f6' },
-]
+const protocolOptions = PROTOCOL_OPTIONS
 
 const currentProtocol = computed(() => props.protocol || 'rest')
 
@@ -119,13 +115,13 @@ const sendLabel = computed(() => {
     default: return 'Send'
   }
 })
-const isNotReady = computed(() => currentProtocol.value !== 'rest')
+const isNotReady = computed(() => currentProtocol.value === 'grpc')
 </script>
 
 <template>
   <div class="flex items-center gap-2 p-3">
     <!-- Protocol selector -->
-    <div class="w-[80px] flex-shrink-0">
+    <div class="w-[100px] flex-shrink-0">
       <BaseSelect
         :model-value="currentProtocol"
         :options="protocolOptions"
