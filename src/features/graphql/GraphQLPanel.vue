@@ -11,6 +11,7 @@ import type { Tab } from '@/stores/tabs'
 import type { GraphQLConfig, GraphQLResponseData, KeyValuePair } from '@/domain'
 import type { KeyValuePairEditable, RequestAuthDraft } from '@/domain'
 import { PROTOCOL_OPTIONS } from '@/domain/protocols-ui'
+import { usePlatform } from '@/composables/usePlatform'
 import BaseButton from '@/components/base/BaseButton.vue'
 import BaseCodeEditor from '@/components/base/BaseCodeEditor.vue'
 import BaseKeyValueEditor from '@/components/base/BaseKeyValueEditor.vue'
@@ -25,6 +26,7 @@ const props = defineProps<{
 
 const tabsStore = useTabsStore()
 const historyStore = useHistoryStore()
+const { formatShortcutLabel } = usePlatform()
 const { isLoading, error, executeQuery, cancelQuery, isIntrospecting, schema, introspectionError, introspect } = useGraphQL()
 
 const activeSection = ref<'query' | 'variables' | 'headers' | 'auth' | 'schema'>('query')
@@ -476,7 +478,7 @@ function insertTypeQuery(type: IntrospectionType) {
             <!-- Empty state -->
             <div v-else-if="!response" class="h-full flex flex-col items-center justify-center text-muted">
               <p class="text-sm">No response yet</p>
-              <p class="text-xs mt-1">Write a query and press Cmd+Enter</p>
+              <p class="text-xs mt-1">Write a query and press {{ formatShortcutLabel('Enter') }}</p>
             </div>
 
             <!-- Response body -->

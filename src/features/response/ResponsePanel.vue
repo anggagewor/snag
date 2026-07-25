@@ -1,13 +1,16 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 
-import { Loader2, AlertTriangle, Zap, Clock, Database, Copy } from 'lucide-vue-next'
+import { Loader2, AlertTriangle, Zap, Clock, Database, Copy, Check, ClipboardCopy } from 'lucide-vue-next'
 
 import type { ResponseData } from '@/domain'
 import { formatBytes } from '@/utils/formatters'
+import { usePlatform } from '@/composables/usePlatform'
 import BaseBadge from '@/components/base/BaseBadge.vue'
 import BaseCodeEditor from '@/components/base/BaseCodeEditor.vue'
 import type { EditorLanguage } from '@/components/base/BaseCodeEditor.vue'
+
+const { formatShortcutLabel } = usePlatform()
 
 const props = defineProps<{
   response?: ResponseData | null
@@ -99,7 +102,7 @@ async function copyBody() {
         <template v-else>
           <Zap class="w-10 h-10 mx-auto text-muted/30 mb-2" :stroke-width="1.5" />
           <p class="text-sm text-muted">Send a request to see the response</p>
-          <p class="text-xs text-muted mt-0.5">Cmd+Enter to send</p>
+          <p class="text-xs text-muted mt-0.5">{{ formatShortcutLabel('Enter') }} to send</p>
         </template>
       </div>
     </div>
@@ -169,14 +172,15 @@ async function copyBody() {
 
           <!-- Copy button -->
           <button
-            class="px-2 py-1 text-xs text-muted hover:text-primary transition-colors rounded hover:bg-surface-hover"
+            class="flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-md transition-colors"
+            :class="copied
+              ? 'bg-success/10 text-success border border-success/30'
+              : 'bg-surface-alt text-primary border border-border hover:border-accent hover:text-accent'"
             @click="copyBody"
           >
-            <span v-if="copied" class="text-success">Copied!</span>
-            <span v-else class="flex items-center gap-1">
-              <Copy class="w-3.5 h-3.5" />
-              Copy
-            </span>
+            <Check v-if="copied" class="w-3.5 h-3.5" />
+            <ClipboardCopy v-else class="w-3.5 h-3.5" />
+            {{ copied ? 'Copied!' : 'Copy' }}
           </button>
         </div>
       </div>

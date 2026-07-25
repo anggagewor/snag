@@ -269,8 +269,8 @@ async function saveVariables() {
 
       <!-- Collection items (recursive) -->
       <div v-if="isExpanded(collection.id)" class="ml-3 border-l border-border-muted pl-2 space-y-0.5">
-        <div v-if="collection.items.length === 0" class="px-2 py-1 text-xs text-muted">
-          Empty collection
+        <div v-if="collection.items.length === 0" class="px-2 py-2 text-xs text-muted italic">
+          No requests yet — use the menu above to add one
         </div>
 
         <CollectionTreeItem

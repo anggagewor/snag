@@ -168,10 +168,27 @@ async function handleNewFolderInCollection() {
     <div class="flex-1 overflow-y-auto">
       <!-- Collections -->
       <div v-if="activeSection === 'collections'" class="p-2">
-        <div v-if="workspaceStore.collections.length === 0" class="text-center py-8">
-          <Folder class="w-10 h-10 mx-auto text-muted/30 mb-2" :stroke-width="1.5" />
-          <p class="text-xs text-muted">No collections yet</p>
-          <p class="text-[10px] text-muted mt-0.5">Create one to organize your requests</p>
+        <div v-if="workspaceStore.collections.length === 0" class="text-center py-8 px-4">
+          <Folder class="w-10 h-10 mx-auto text-muted/30 mb-3" :stroke-width="1.5" />
+          <p class="text-sm text-muted font-medium">No collections yet</p>
+          <p class="text-[11px] text-muted mt-1 leading-relaxed">
+            Create a collection to organize your requests, or import from Postman/OpenAPI.
+          </p>
+          <div class="flex flex-col gap-1.5 mt-4">
+            <button
+              class="w-full px-3 py-2 text-xs rounded-md bg-accent text-white hover:bg-accent-hover transition-colors"
+              @click="handleNewCollection()"
+            >
+              Create Collection
+            </button>
+            <button
+              class="w-full px-3 py-2 text-xs rounded-md text-accent border border-accent/30 hover:bg-accent/5 transition-colors"
+              @click="showImportModal = true"
+            >
+              Import from Postman / OpenAPI
+            </button>
+          </div>
+          <p class="text-[10px] text-muted/70 mt-3">You can also paste a cURL command in the URL bar</p>
         </div>
         <CollectionTree v-else />
       </div>
@@ -198,8 +215,12 @@ async function handleNewFolderInCollection() {
             </div>
           </div>
 
-          <div v-if="workspaceStore.environments.length === 0" class="px-2 py-2 text-xs text-muted">
-            No environments yet
+          <div v-if="workspaceStore.environments.length === 0" class="text-center py-4 px-2">
+            <FlaskConical class="w-8 h-8 mx-auto text-muted/30 mb-2" :stroke-width="1.5" />
+            <p class="text-xs text-muted">No environments yet</p>
+            <p class="text-[10px] text-muted mt-0.5 leading-relaxed">
+              Environments let you switch between dev, staging, and production variables.
+            </p>
           </div>
 
           <button

@@ -3,11 +3,15 @@ import { onMounted, onBeforeUnmount } from 'vue'
 import { useTabsStore } from '@/stores/tabs'
 import { useHttp } from '@/composables/useHttp'
 import { useHistoryStore } from '@/stores/history'
+import { useUndoRedo } from '@/composables/useUndoRedo'
+import { openSearchPanel } from '@codemirror/search'
+import { getVisibleEditor } from '@/utils/editor-registry'
 
 export function useKeyboard() {
   const tabsStore = useTabsStore()
   const historyStore = useHistoryStore()
   const { sendRequest } = useHttp()
+  const { undo, redo } = useUndoRedo()
 
   async function handleSendRequest() {
     const tab = tabsStore.activeTab
@@ -55,6 +59,36 @@ export function useKeyboard() {
         const tab = tabsStore.activeTab
         if (tab && tab.type === 'request' && tab.isDirty) {
           tabsStore.saveTab(tab.id)
+        }
+        break
+      }
+      case 'z': {
+        // Don't interfere with CodeMirror's own undo
+        if ((e.target as HTMLElement)?.closest?.('.cm-editor')) break
+        e.preventDefault()
+        if (e.shiftKey) {
+          redo()
+        } else {
+          undo()
+        }
+        break
+      }
+      case 'y': {
+        if ((e.target as HTMLElement)?.closest?.('.cm-editor')) break
+        e.preventDefault()
+        redo()
+        break
+      }
+      case 'f': {
+        // If already inside a CodeMirror, let it handle its own search
+        if ((e.target as HTMLElement)?.closest?.('.cm-editor')) break
+
+        // Find a visible CodeMirror editor and open its search panel
+        const editor = getVisibleEditor()
+        if (editor) {
+          e.preventDefault()
+          editor.focus()
+          openSearchPanel(editor)
         }
         break
       }

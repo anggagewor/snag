@@ -1,5 +1,8 @@
 <script setup lang="ts">
 import { ref, useTemplateRef, computed } from 'vue'
+import { usePlatform } from '@/composables/usePlatform'
+
+const { isMac } = usePlatform()
 
 const props = withDefaults(defineProps<{
   text: string
@@ -11,6 +14,12 @@ const props = withDefaults(defineProps<{
   position: 'top',
   delay: 400,
   block: false,
+})
+
+const resolvedShortcut = computed(() => {
+  if (!props.shortcut) return undefined
+  if (isMac) return props.shortcut
+  return props.shortcut.replace(/⌘/g, 'Ctrl+')
 })
 
 const isVisible = ref(false)
@@ -87,10 +96,10 @@ function hide() {
       >
         <span class="text-[11px] text-white break-all">{{ text }}</span>
         <kbd
-          v-if="shortcut"
+          v-if="resolvedShortcut"
           class="ml-2 inline-flex items-center px-1.5 py-0.5 text-[10px] font-mono text-gray-300 bg-gray-800 dark:bg-gray-600 rounded"
         >
-          {{ shortcut }}
+          {{ resolvedShortcut }}
         </kbd>
       </div>
     </Transition>

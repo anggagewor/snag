@@ -4,6 +4,7 @@ import { watch } from 'vue'
 import { Loader2, AlertCircle } from 'lucide-vue-next'
 
 import { useTabsStore } from '@/stores/tabs'
+import { usePlatform } from '@/composables/usePlatform'
 import RequestPanel from '@/features/request/RequestPanel.vue'
 import WebSocketPanel from '@/features/websocket/WebSocketPanel.vue'
 import GraphQLPanel from '@/features/graphql/GraphQLPanel.vue'
@@ -12,6 +13,7 @@ import EnvironmentPanel from '@/features/environments/EnvironmentPanel.vue'
 import CookiePanel from '@/features/cookies/CookiePanel.vue'
 
 const tabsStore = useTabsStore()
+const { formatShortcutLabel } = usePlatform()
 
 // Lazy-load draft when tab activates with undefined requestDraft
 watch(
@@ -33,8 +35,21 @@ watch(
       class="h-full flex flex-col items-center justify-center text-muted"
     >
       <h1 class="text-3xl font-bold text-primary/20 mb-6 tracking-tight">Snag</h1>
-      <p class="text-sm">Open a request or create a new one</p>
-      <p class="text-xs mt-1">Cmd+T to open a new tab</p>
+      <p class="text-sm text-secondary">Open a request or create a new one</p>
+      <div class="mt-4 flex flex-col items-center gap-2 text-xs text-muted">
+        <div class="flex items-center gap-3">
+          <kbd class="px-1.5 py-0.5 bg-surface-alt border border-border rounded text-[10px] font-mono">{{ formatShortcutLabel('T') }}</kbd>
+          <span>New tab</span>
+        </div>
+        <div class="flex items-center gap-3">
+          <kbd class="px-1.5 py-0.5 bg-surface-alt border border-border rounded text-[10px] font-mono">{{ formatShortcutLabel('K') }}</kbd>
+          <span>Search requests</span>
+        </div>
+        <div class="flex items-center gap-3">
+          <kbd class="px-1.5 py-0.5 bg-surface-alt border border-border rounded text-[10px] font-mono">{{ formatShortcutLabel('Enter') }}</kbd>
+          <span>Send request</span>
+        </div>
+      </div>
     </div>
 
     <!-- Error state -->

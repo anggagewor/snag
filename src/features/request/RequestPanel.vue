@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, watch, onBeforeUnmount } from 'vue'
 
 import { useTabsStore } from '@/stores/tabs'
 import { useHistoryStore } from '@/stores/history'
 import { useWorkspaceStore } from '@/stores/workspace'
 import { useHttp } from '@/composables/useHttp'
 import { useScriptRunner } from '@/composables/useScriptRunner'
+import { useUndoRedo } from '@/composables/useUndoRedo'
 import type { Tab } from '@/stores/tabs'
 import type { HttpMethod, ProtocolType } from '@/domain'
 import type { TestResult } from '@/composables/useScriptRunner'
@@ -29,6 +30,42 @@ const historyStore = useHistoryStore()
 const workspaceStore = useWorkspaceStore()
 const { isLoading, error, sendRequest, cancelRequest } = useHttp()
 const { runPreRequestScript, runTestScript } = useScriptRunner()
+const { recordChange, initTab, disposeTab } = useUndoRedo()
+
+// Initialize undo stack when draft is ready
+let undoInitialized = false
+watch(
+  () => props.tab.requestDraft,
+  (draft) => {
+    if (draft && !undoInitialized) {
+      initTab(props.tab.id, draft)
+      undoInitialized = true
+    }
+  },
+  { immediate: true },
+)
+
+// Watch for draft changes and record for undo
+let lastDraftJson = props.tab.requestDraft ? JSON.stringify(props.tab.requestDraft) : ''
+watch(
+  () => props.tab.requestDraft,
+  (draft) => {
+    if (!draft) return
+    const json = JSON.stringify(draft)
+    if (json !== lastDraftJson) {
+      // Record the previous state before applying this change
+      if (lastDraftJson) {
+        recordChange(props.tab.id, JSON.parse(lastDraftJson))
+      }
+      lastDraftJson = json
+    }
+  },
+  { deep: true },
+)
+
+onBeforeUnmount(() => {
+  disposeTab(props.tab.id)
+})
 
 const activeSection = ref<'params' | 'headers' | 'body' | 'auth' | 'scripts'>('params')
 const scriptLogs = ref<string[]>([])

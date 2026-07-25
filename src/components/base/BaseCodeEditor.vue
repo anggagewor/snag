@@ -12,6 +12,7 @@ import { oneDark } from '@codemirror/theme-one-dark'
 import { syntaxHighlighting, defaultHighlightStyle, bracketMatching, foldGutter } from '@codemirror/language'
 import { autocompletion, closeBrackets } from '@codemirror/autocomplete'
 import { highlightSelectionMatches, searchKeymap, search } from '@codemirror/search'
+import { registerEditor, unregisterEditor } from '@/utils/editor-registry'
 
 export type EditorLanguage = 'json' | 'javascript' | 'html' | 'xml' | 'text'
 
@@ -109,9 +110,14 @@ onMounted(() => {
     state,
     parent: editorContainer.value,
   })
+
+  registerEditor(view.value)
 })
 
 onBeforeUnmount(() => {
+  if (view.value) {
+    unregisterEditor(view.value)
+  }
   view.value?.destroy()
 })
 

@@ -16,6 +16,7 @@ import { useTabsStore } from '@/stores/tabs'
 import type { Tab } from '@/stores/tabs'
 import type { WebSocketConfig, KeyValuePair } from '@/domain'
 import { PROTOCOL_OPTIONS } from '@/domain/protocols-ui'
+import { usePlatform } from '@/composables/usePlatform'
 import BaseButton from '@/components/base/BaseButton.vue'
 import BaseKeyValueEditor from '@/components/base/BaseKeyValueEditor.vue'
 import BaseCodeEditor from '@/components/base/BaseCodeEditor.vue'
@@ -28,6 +29,7 @@ const props = defineProps<{
 }>()
 
 const tabsStore = useTabsStore()
+const { formatShortcutLabel } = usePlatform()
 const { session, isConnected, isConnecting, connect, disconnect, sendMessage, clearMessages } = useWebSocket()
 
 const messageInput = ref('')
@@ -290,7 +292,7 @@ watch(session, (s) => {
               Send
             </BaseButton>
           </div>
-          <p class="text-[10px] text-secondary mt-1">Cmd+Enter to send</p>
+          <p class="text-[10px] text-secondary mt-1">{{ formatShortcutLabel('Enter') }} to send</p>
         </div>
       </div>
 
