@@ -1,0 +1,9 @@
+[Desktop Entry]
+Name=Snag
+Comment=API client desktop app
+Exec=env GTK_CSD=0 snag
+Icon=snag
+Type=Application
+Categories=Development;Network;
+Keywords=api;http;rest;postman;
+StartupWMClass=snag

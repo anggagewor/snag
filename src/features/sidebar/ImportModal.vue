@@ -3,6 +3,7 @@ import { ref } from 'vue'
 
 import { useWorkspaceStore } from '@/stores/workspace'
 import { importPostmanCollection } from '@/utils/import-postman'
+import { importHoppscotchCollection, isHoppscotchCollection } from '@/utils/import-hoppscotch'
 import { importOpenApiSpec } from '@/utils/import-openapi'
 import { importPostmanEnvironment, isPostmanEnvironment } from '@/utils/import-environment'
 import * as yaml from 'js-yaml'
@@ -18,7 +19,7 @@ const emit = defineEmits<{
 
 const workspaceStore = useWorkspaceStore()
 
-const importType = ref<'postman' | 'openapi' | 'environment'>('postman')
+const importType = ref<'postman' | 'hoppscotch' | 'openapi' | 'environment'>('postman')
 const importText = ref('')
 const importError = ref<string | null>(null)
 const importSuccess = ref<string | null>(null)
@@ -97,6 +98,8 @@ async function handleImport() {
       let collection
       if (importType.value === 'postman') {
         collection = importPostmanCollection(json)
+      } else if (importType.value === 'hoppscotch') {
+        collection = importHoppscotchCollection(json)
       } else {
         collection = importOpenApiSpec(json)
       }
@@ -220,6 +223,8 @@ function autoDetectType() {
       importType.value = 'environment'
     } else if (parsed.openapi || parsed.swagger) {
       importType.value = 'openapi'
+    } else if (isHoppscotchCollection(parsed)) {
+      importType.value = 'hoppscotch'
     } else if (
       (parsed.info as Record<string, unknown>)?.schema?.toString().includes('postman') ||
       (parsed.info as Record<string, unknown>)?._postman_id ||
@@ -247,8 +252,18 @@ function autoDetectType() {
               : 'border-border text-primary hover:bg-surface-hover'"
             @click="importType = 'postman'"
           >
-            <span class="font-medium">Postman Collection</span>
-            <p class="text-[10px] mt-0.5 opacity-70">v2.1 JSON format</p>
+            <span class="font-medium">Postman</span>
+            <p class="text-[10px] mt-0.5 opacity-70">Collection v2.1</p>
+          </button>
+          <button
+            class="flex-1 px-3 py-2 text-xs rounded border transition-colors text-left"
+            :class="importType === 'hoppscotch'
+              ? 'border-accent bg-accent/5 text-accent'
+              : 'border-border text-primary hover:bg-surface-hover'"
+            @click="importType = 'hoppscotch'"
+          >
+            <span class="font-medium">Hoppscotch</span>
+            <p class="text-[10px] mt-0.5 opacity-70">Collection JSON</p>
           </button>
           <button
             class="flex-1 px-3 py-2 text-xs rounded border transition-colors text-left"
@@ -257,7 +272,7 @@ function autoDetectType() {
               : 'border-border text-primary hover:bg-surface-hover'"
             @click="importType = 'openapi'"
           >
-            <span class="font-medium">OpenAPI Spec</span>
+            <span class="font-medium">OpenAPI</span>
             <p class="text-[10px] mt-0.5 opacity-70">3.x / Swagger 2.x</p>
           </button>
           <button
